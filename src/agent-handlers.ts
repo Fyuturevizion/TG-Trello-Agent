@@ -14,8 +14,9 @@ import {
   getRun,
   isTerminalRunStatus,
 } from './cursor-api';
+import { buildIntruderReply, recordIntruderAttempt } from './agent-intruder';
 import { escapeHtml } from './telegram-format';
-import { isAdminUser, sendMessage } from './telegram';
+import { isAdminUser, normalizeCommand, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
 
 const POLL_MS = 5000;
@@ -107,14 +108,23 @@ export async function handleAgentCommand(
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
 ): Promise<boolean> {
   const text = message.text?.trim() ?? '';
-  if (!text.toLowerCase().startsWith('/agent')) return false;
+  const firstToken = text.split(/\s+/)[0] ?? '';
+  if (normalizeCommand(firstToken) !== '/agent') return false;
 
   const userId = message.from?.id;
   const chatId = message.chat.id;
   if (!userId) return true;
 
+  const rest = text.slice(firstToken.length).trim();
+
   if (!isAdminUser(env, userId)) {
-    await sendMessage(env, chatId, 'Only the bot admin can use /agent commands.');
+    const record = await recordIntruderAttempt(env, userId);
+    await sendMessage(
+      env,
+      chatId,
+      buildIntruderReply(record, message.from?.username, message.from?.first_name),
+      { parseMode: 'HTML' },
+    );
     return true;
   }
 
@@ -126,8 +136,6 @@ export async function handleAgentCommand(
     );
     return true;
   }
-
-  const rest = text.slice('/agent'.length).trim();
 
   if (!rest || rest === 'help') {
     await sendMessage(env, chatId, helpText(), { parseMode: 'HTML' });

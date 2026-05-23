@@ -141,13 +141,26 @@ async function processUpdate(
 
     await handleBotMessage(env, message);
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     console.error(
       JSON.stringify({
         event: 'update_handler_error',
         update_id: update.update_id,
-        error: error instanceof Error ? error.message : String(error),
+        error: errMsg,
+        stack: error instanceof Error ? error.stack : undefined,
       }),
     );
+    try {
+      if (update.message?.chat?.id) {
+        await sendMessage(
+          env,
+          update.message.chat.id,
+          `Bot error: ${errMsg.slice(0, 500)}`,
+        );
+      }
+    } catch {
+      // ignore notify failure
+    }
   }
 }
 
