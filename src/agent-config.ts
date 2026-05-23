@@ -1,0 +1,72 @@
+import type { Env } from './types';
+
+const CONFIG_KEY = 'agent:config';
+const SESSION_KEY = 'agent:session';
+const TTL_SECONDS = 90 * 24 * 60 * 60;
+
+export interface AgentConfig {
+  repoUrl: string;
+  startingRef: string;
+  modelId: string;
+  autoCreatePR: boolean;
+  systemInstructions: string;
+}
+
+export interface AgentSession {
+  agentId: string;
+  latestRunId?: string;
+  agentUrl?: string;
+  notifyChatId: number;
+  lastPrompt?: string;
+  updatedAt: string;
+}
+
+const DEFAULT_INSTRUCTIONS = [
+  'You maintain the WLTH Telegram → Trello triage bot.',
+  'Stack: Cloudflare Worker (Hono), Mini App in public/, Trello + Telegram webhooks.',
+  'Make minimal, focused changes. Match existing code style. Deploy with wrangler.',
+].join(' ');
+
+export function defaultAgentConfig(env: Env): AgentConfig {
+  return {
+    repoUrl: env.CURSOR_AGENT_REPO_URL?.trim() ?? '',
+    startingRef: env.CURSOR_AGENT_REPO_REF?.trim() || 'main',
+    modelId: env.CURSOR_AGENT_MODEL?.trim() || 'composer-2.5',
+    autoCreatePR: env.CURSOR_AGENT_AUTO_PR === 'true',
+    systemInstructions: DEFAULT_INSTRUCTIONS,
+  };
+}
+
+export async function loadAgentConfig(env: Env): Promise<AgentConfig> {
+  const defaults = defaultAgentConfig(env);
+  const raw = await env.SESSIONS.get(CONFIG_KEY);
+  if (!raw) return defaults;
+  try {
+    const stored = JSON.parse(raw) as Partial<AgentConfig>;
+    return { ...defaults, ...stored };
+  } catch {
+    return defaults;
+  }
+}
+
+export async function saveAgentConfig(env: Env, config: AgentConfig): Promise<void> {
+  await env.SESSIONS.put(CONFIG_KEY, JSON.stringify(config), { expirationTtl: TTL_SECONDS });
+}
+
+export async function loadAgentSession(env: Env): Promise<AgentSession | null> {
+  const raw = await env.SESSIONS.get(SESSION_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AgentSession;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveAgentSession(env: Env, session: AgentSession): Promise<void> {
+  await env.SESSIONS.put(SESSION_KEY, JSON.stringify(session), { expirationTtl: TTL_SECONDS });
+}
+
+export async function clearAgentSession(env: Env): Promise<void> {
+  await env.SESSIONS.delete(SESSION_KEY);
+}

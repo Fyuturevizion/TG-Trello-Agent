@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "wlth-tg-trello-triage",
+  "account_id": "53d52ffd40feb5356ce596aadef30109",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "f0410b75a6a64333acdeffbe09374d37"
+    }
+  ],
+  "vars": {
+    "SESSION_TTL_SECONDS": "3600",
+    "MAX_PHOTOS": "3",
+    "TRELLO_BOARD_NAME": "Support/Triage",
+    "WEBAPP_URL": "https://wlth-tg-trello-triage.baris-53d.workers.dev",
+    "TRELLO_BOARD_ID": "6682b4ab48fd9e545c9c8f55",
+    "TRELLO_DONE_LIST_ID": "677ce5f672325218b334190b",
+    "TRELLO_DEV_BOARD_ID": "67c69786712bda847551b0f5",
+    "CURSOR_AGENT_REPO_URL": "https://github.com/Fyuturevizion/TG-Trello-Agent",
+    "CURSOR_AGENT_REPO_REF": "main",
+    "CURSOR_AGENT_MODEL": "composer-2.5",
+    "CURSOR_AGENT_AUTO_PR": "true"
+  },
+  "triggers": {
+    "crons": ["0 8 * * *"]
+  }
+}

@@ -1,0 +1,105 @@
+import { browserLabel } from './browsers';
+import type { BrowserKey } from './browsers';
+import type { CardReporter } from './card-reporter';
+import { deviceDisplayLabel } from './devices';
+import type { DeviceKey } from './devices';
+import { escapeHtml, formatReporterMention } from './telegram-format';
+import { sendMessage } from './telegram';
+import type { Env, ReportType } from './types';
+import { REPORT_TYPE_LABELS } from './types';
+import { webappUrlWithVersion } from './webapp-version';
+
+export async function announceNewCard(
+  env: Env,
+  input: {
+    type: ReportType;
+    device: DeviceKey;
+    browser?: BrowserKey;
+    title: string;
+    cardName: string;
+    shortUrl: string;
+    reporterUsername?: string;
+    reporterId: number;
+    reporterFirstName?: string;
+  },
+): Promise<void> {
+  const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
+  if (!Number.isFinite(chatId)) return;
+
+  const mention = formatReporterMention(input);
+  const devicePart = deviceDisplayLabel(
+    input.device,
+    input.browser ? browserLabel(input.browser) : undefined,
+  );
+
+  const text = [
+    `✅ New triage card — ${mention}`,
+    '',
+    `<b>${escapeHtml(REPORT_TYPE_LABELS[input.type])}</b> · ${escapeHtml(devicePart)}`,
+    escapeHtml(input.title),
+    '',
+    escapeHtml(input.shortUrl),
+  ].join('\n');
+
+  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+}
+
+export async function announceTrelloEvent(
+  env: Env,
+  lines: string[],
+  reporter?: CardReporter | null,
+): Promise<void> {
+  const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
+  if (!Number.isFinite(chatId)) return;
+
+  let text = lines.join('\n');
+  if (reporter) {
+    const mention = formatReporterMention(reporter);
+    text = `${text}\n\nReporter: ${mention}`;
+  }
+
+  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+}
+
+export async function notifyReporterDm(
+  env: Env,
+  reporterId: number,
+  text: string,
+): Promise<void> {
+  try {
+    await sendMessage(env, reporterId, text, { parseMode: 'HTML' });
+  } catch {
+    // User may not have started the bot
+  }
+}
+
+export function webAppUrl(env: Env, query?: Record<string, string>): string {
+  const base = (env.WEBAPP_URL ?? '').replace(/\/$/, '');
+  if (!base) return '/';
+  return webappUrlWithVersion(base, query);
+}
+
+const BOT_USERNAME = 'WLTH_Triage_Bot';
+
+/** Opens via BotFather main Mini App (needs Configure Mini App URL + cache bust ?ui=). */
+export function channelTriggerKeyboard(_env: Env) {
+  return channelStartAppKeyboard();
+}
+
+export function channelStartAppKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: 'Report bug', url: `https://t.me/${BOT_USERNAME}?startapp=bug` }],
+      [{ text: 'Wishlist', url: `https://t.me/${BOT_USERNAME}?startapp=wishlist` }],
+    ],
+  };
+}
+
+export function channelWebAppKeyboard(env: Env) {
+  return {
+    inline_keyboard: [
+      [{ text: 'Report bug', web_app: { url: webAppUrl(env, { type: 'bug' }) } }],
+      [{ text: 'Wishlist', web_app: { url: webAppUrl(env, { type: 'wishlist' }) } }],
+    ],
+  };
+}

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>WLTH QA Report</title>
+    <link rel="icon" href="/wlth-icon.png" type="image/png" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <link rel="stylesheet" href="/styles.css?v=20260524-agent2" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="site-header">
+        <div class="site-header-inner">
+          <div class="brand-lockup">
+            <img
+              class="brand-icon"
+              src="/wlth-icon.png?v=20260524-agent"
+              alt=""
+              width="36"
+              height="36"
+              decoding="async"
+            />
+            <span class="brand-title">WLTH Product Agent</span>
+          </div>
+          <span class="top-bar-badge">Triage</span>
+        </div>
+      </header>
+
+      <main class="app" id="appMain">
+        <section class="hero">
+          <p class="eyebrow">Support/Triage → INBOX</p>
+          <h1>Report an issue</h1>
+          <p class="subtitle">Submit once. Your team gets one clean update in the QA channel.</p>
+        </section>
+
+        <form id="form" class="form-stack">
+          <section class="card">
+            <h2 class="field-label">Report type</h2>
+            <div class="segmented" role="radiogroup" aria-label="Report type">
+              <label class="segmented-item">
+                <input type="radio" name="type" value="bug" checked />
+                <span>Bug</span>
+              </label>
+              <label class="segmented-item">
+                <input type="radio" name="type" value="wishlist" />
+                <span>Wishlist</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2 class="field-label">
+              Device
+              <span class="hint">Trello field</span>
+            </h2>
+            <div class="select-wrap">
+              <select name="device" id="device" required aria-label="Device">
+                <option value="android">Android Mobile</option>
+                <option value="iphone">iPhone</option>
+                <option value="apple_laptop">Apple Laptop</option>
+                <option value="pc">PC</option>
+              </select>
+            </div>
+          </section>
+
+          <section class="card" id="browserSection" hidden>
+            <h2 class="field-label">
+              Browser
+              <span class="hint">Mac / PC</span>
+            </h2>
+            <div class="select-wrap">
+              <select name="browser" id="browser" aria-label="Browser">
+                <option value="">Select browser…</option>
+                <option value="chrome">Chrome</option>
+                <option value="safari">Safari</option>
+                <option value="firefox">Firefox</option>
+                <option value="edge">Edge</option>
+                <option value="brave">Brave</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </section>
+
+          <section class="card">
+            <label class="field-label" for="title">Card title</label>
+            <input id="title" name="title" required maxlength="200" placeholder="Short summary" />
+          </section>
+
+          <section class="card">
+            <label class="field-label" for="details">Description</label>
+            <textarea
+              id="details"
+              name="details"
+              required
+              maxlength="4000"
+              rows="4"
+              placeholder="Steps to reproduce, expected vs actual, app version…"
+            ></textarea>
+          </section>
+
+          <section class="card">
+            <h2 class="field-label">
+              ERC address
+              <span class="hint">Trello field</span>
+            </h2>
+            <label class="check-row">
+              <input type="checkbox" id="ercNa" />
+              <span>Not applicable</span>
+            </label>
+            <input name="ercAddress" id="ercInput" placeholder="0x…" maxlength="128" />
+          </section>
+
+          <section class="card">
+            <h2 class="field-label">
+              Screenshots
+              <span class="hint">optional</span>
+            </h2>
+            <label class="file-trigger">
+              <span class="file-trigger-btn">Choose files</span>
+              <span class="file-trigger-name" id="fileLabel">No files selected</span>
+              <input type="file" id="photos" accept="image/*" multiple hidden />
+            </label>
+          </section>
+
+          <p id="error" class="error" hidden role="alert"></p>
+        </form>
+
+        <footer class="submit-bar">
+          <button type="submit" id="submit" form="form">Save to Trello INBOX</button>
+        </footer>
+      </main>
+
+      <div id="fallback" class="fallback" hidden>
+        <div class="card">
+          <h1>Open in Telegram</h1>
+          <p>This form runs inside the WLTH Triage Mini App.</p>
+          <p>
+            <a href="https://t.me/WLTH_Triage_Bot">@WLTH_Triage_Bot</a>
+            → Menu → <strong>Report to Trello</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+    <script src="/app.js?v=20260524-agent2" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "tg-trello-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler check",
+    "types": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "set-webhook": "tsx scripts/set-webhook.ts",
+    "setup-telegram": "tsx scripts/setup-telegram.ts",
+    "check:webapp": "tsx scripts/check-webapp.ts",
+    "setup:channel": "tsx scripts/setup-channel.ts",
+    "setup:menu": "tsx scripts/setup-menu-button.ts",
+    "setup:trello-webhook": "tsx scripts/setup-trello-webhook.ts",
+    "setup:all": "npm run setup:menu && npm run setup:channel && npm run setup:trello-webhook",
+    "resolve-trello-ids": "tsx scripts/resolve-trello-ids.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.19.0"
+  },
+  "dependencies": {
+    "hono": "^4.7.10"
+  }
+}
