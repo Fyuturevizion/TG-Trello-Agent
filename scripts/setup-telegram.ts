@@ -47,12 +47,15 @@ async function api<T>(token: string, method: string, body?: unknown): Promise<T>
   return data.result as T;
 }
 
-const COMMANDS = [
+const PUBLIC_COMMANDS = [
   { command: 'report', description: 'Open bug or wishlist report form' },
   { command: 'bug', description: 'Shortcut: report a bug' },
   { command: 'wishlist', description: 'Shortcut: submit a wishlist item' },
   { command: 'help', description: 'Show available commands' },
-  { command: 'agent', description: 'Admin: Cursor agent to update triage bot' },
+];
+
+const ADMIN_COMMANDS = [
+  { command: 'master_splinter', description: 'Admin: Master_Splinter maintainer' },
 ];
 
 async function main(): Promise<void> {
@@ -62,8 +65,22 @@ async function main(): Promise<void> {
   const me = await api<{ username: string; first_name: string }>(token, 'getMe');
   console.log(`Bot: @${me.username} (${me.first_name})`);
 
-  await api(token, 'setMyCommands', { commands: COMMANDS });
-  console.log('Commands registered:', COMMANDS.map((c) => `/${c.command}`).join(', '));
+  await api(token, 'setMyCommands', { commands: PUBLIC_COMMANDS });
+  console.log('Public commands:', PUBLIC_COMMANDS.map((c) => `/${c.command}`).join(', '));
+
+  const adminIds = (optionalEnv('TELEGRAM_ADMIN_USER_IDS') ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+  for (const adminId of adminIds) {
+    const userId = Number(adminId);
+    if (!Number.isFinite(userId)) continue;
+    await api(token, 'setMyCommands', {
+      commands: [...PUBLIC_COMMANDS, ...ADMIN_COMMANDS],
+      scope: { type: 'chat_member', chat_id: userId, user_id: userId },
+    });
+    console.log(`Admin commands for user ${userId}: /master_splinter`);
+  }
 
   const webhookUrl = (() => {
     const explicit = optionalEnv('WEBHOOK_URL');

@@ -73,8 +73,6 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
         '/setup — post pinned buttons in QA channel (admin)',
         '/chatid — show this chat ID',
         '/myid — show your Telegram user ID',
-        '',
-        'Admin: /agent — Cursor cloud agent to update this bot (see /agent help)',
       ].join('\n'),
       { replyMarkup: channelTriggerKeyboard(env) },
     );

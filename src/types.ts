@@ -56,7 +56,7 @@ export interface Env {
   TRELLO_ARCHIVE_LIST_IDS?: string;
   SESSION_TTL_SECONDS?: string;
   MAX_PHOTOS?: string;
-  /** Cursor Cloud Agents API key (admin /agent commands). */
+  /** Cursor Cloud Agents API key (admin /master-splinter commands). */
   CURSOR_API_KEY?: string;
   CURSOR_AGENT_REPO_URL?: string;
   CURSOR_AGENT_REPO_REF?: string;

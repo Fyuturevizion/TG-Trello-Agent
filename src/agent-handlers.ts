@@ -14,13 +14,18 @@ import {
   getRun,
   isTerminalRunStatus,
 } from './cursor-api';
-import { buildIntruderReply, recordIntruderAttempt } from './agent-intruder';
 import { escapeHtml } from './telegram-format';
 import { isAdminUser, normalizeCommand, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
 
 const POLL_MS = 5000;
 const MAX_POLLS = 72; // ~6 minutes
+const MASTER_SPLINTER_CMD = '/master_splinter';
+
+function isMasterSplinterCommand(firstToken: string): boolean {
+  const cmd = normalizeCommand(firstToken);
+  return cmd === MASTER_SPLINTER_CMD || cmd === '/master-splinter';
+}
 
 function buildPrompt(config: AgentConfig, userPrompt: string): string {
   return [config.systemInstructions, '', '---', '', 'Admin request (Telegram):', userPrompt].join(
@@ -30,21 +35,21 @@ function buildPrompt(config: AgentConfig, userPrompt: string): string {
 
 function helpText(): string {
   return [
-    '<b>WLTH Triage — Cursor agent (admin only)</b>',
+    '<b>Master_Splinter — dojo maintainer (admin only)</b>',
     '',
     '<b>Run</b>',
-    '/agent &lt;prompt&gt; — ask the agent to change this repo',
-    '/agent status — last run status',
-    '/agent cancel — cancel active run',
-    '/agent reset — forget session (start fresh next time)',
+    '/master-splinter &lt;prompt&gt; — ask Master_Splinter to change this repo',
+    '/master-splinter status — last run status',
+    '/master-splinter cancel — cancel active run',
+    '/master-splinter reset — forget session (start fresh next time)',
     '',
     '<b>Config</b>',
-    '/agent config — show settings',
-    '/agent config repo &lt;github url&gt;',
-    '/agent config branch &lt;ref&gt;',
-    '/agent config model &lt;model id&gt;',
-    '/agent config pr on|off',
-    '/agent config instructions &lt;text&gt;',
+    '/master-splinter config — show settings',
+    '/master-splinter config repo &lt;github url&gt;',
+    '/master-splinter config branch &lt;ref&gt;',
+    '/master-splinter config model &lt;model id&gt;',
+    '/master-splinter config pr on|off',
+    '/master-splinter config instructions &lt;text&gt;',
   ].join('\n');
 }
 
@@ -53,7 +58,6 @@ async function pollAndNotify(
   chatId: number,
   agentId: string,
   runId: string,
-  agentUrl?: string,
 ): Promise<void> {
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise((r) => setTimeout(r, POLL_MS));
@@ -72,32 +76,21 @@ async function pollAndNotify(
 
     if (!isTerminalRunStatus(run.status)) continue;
 
-    const link = agentUrl ? `\n${escapeHtml(agentUrl)}` : '';
     const result = run.result?.trim();
     const summary =
       run.status === 'FINISHED'
-        ? '<b>Cursor agent finished</b>'
-        : `<b>Cursor agent ${escapeHtml(run.status)}</b>`;
+        ? '<b>Master_Splinter finished</b>'
+        : `<b>Master_Splinter ${escapeHtml(run.status)}</b>`;
 
-    const text = [
-      summary,
-      result ? `\n\n${escapeHtml(result.slice(0, 3500))}` : '',
-      link,
-    ].join('');
+    const text = [summary, result ? `\n\n${escapeHtml(result.slice(0, 3500))}` : ''].join('');
     await sendMessage(env, chatId, text, { parseMode: 'HTML' });
     return;
   }
 
-  const session = await loadAgentSession(env);
-  const link = session?.agentUrl ?? agentUrl;
   await sendMessage(
     env,
     chatId,
-    [
-      '<b>Cursor agent still running</b>',
-      'Check progress in the dashboard:',
-      link ? escapeHtml(link) : '(no link)',
-    ].join('\n'),
+    ['<b>Master_Splinter still working</b>', 'Still shaping the code — hang tight.'].join('\n'),
     { parseMode: 'HTML' },
   );
 }
@@ -109,7 +102,7 @@ export async function handleAgentCommand(
 ): Promise<boolean> {
   const text = message.text?.trim() ?? '';
   const firstToken = text.split(/\s+/)[0] ?? '';
-  if (normalizeCommand(firstToken) !== '/agent') return false;
+  if (!isMasterSplinterCommand(firstToken)) return false;
 
   const userId = message.from?.id;
   const chatId = message.chat.id;
@@ -117,22 +110,14 @@ export async function handleAgentCommand(
 
   const rest = text.slice(firstToken.length).trim();
 
-  if (!isAdminUser(env, userId)) {
-    const record = await recordIntruderAttempt(env, userId);
-    await sendMessage(
-      env,
-      chatId,
-      buildIntruderReply(record, message.from?.username, message.from?.first_name),
-      { parseMode: 'HTML' },
-    );
-    return true;
-  }
+  // Non-admins: silent — do not engage channel users at the dojo gate.
+  if (!isAdminUser(env, userId)) return true;
 
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
       env,
       chatId,
-      'Cursor API is not configured. Add CURSOR_API_KEY as a Worker secret (Cursor Dashboard → Integrations).',
+      'Maintainer API is not configured on the Worker. Ask your ops lead to set CURSOR_API_KEY.',
     );
     return true;
   }
@@ -145,7 +130,7 @@ export async function handleAgentCommand(
   if (rest === 'status') {
     const session = await loadAgentSession(env);
     if (!session) {
-      await sendMessage(env, chatId, 'No active Cursor agent session. Use /agent &lt;prompt&gt; to start.', {
+      await sendMessage(env, chatId, 'No active session. Use /master-splinter &lt;prompt&gt; to start.', {
         parseMode: 'HTML',
       });
       return true;
@@ -164,9 +149,8 @@ export async function handleAgentCommand(
         env,
         chatId,
         [
-          `<b>Agent</b> ${escapeHtml(agent.id)}`,
+          `<b>Session</b> ${escapeHtml(agent.id)}`,
           `Status: ${escapeHtml(agent.status ?? 'unknown')}${runLine}`,
-          agent.url ? escapeHtml(agent.url) : '',
         ].join('\n'),
         { parseMode: 'HTML' },
       );
@@ -183,7 +167,7 @@ export async function handleAgentCommand(
 
   if (rest === 'reset') {
     await clearAgentSession(env);
-    await sendMessage(env, chatId, 'Cursor agent session cleared. Next /agent will create a new agent.');
+    await sendMessage(env, chatId, 'Session cleared. Next /master-splinter will start fresh.');
     return true;
   }
 
@@ -254,7 +238,7 @@ export async function handleAgentCommand(
       chatId,
       [
         'Set the GitHub repo first:',
-        '/agent config repo https://github.com/your-org/TG-Trello-Agent',
+        '/master-splinter config repo https://github.com/your-org/TG-Trello-Agent',
         '',
         'Or set CURSOR_AGENT_REPO_URL on the Worker.',
       ].join('\n'),
@@ -317,20 +301,19 @@ export async function handleAgentCommand(
       updatedAt: new Date().toISOString(),
     });
 
-    const link = agentUrl ? `\n${agentUrl}` : '';
     await sendMessage(
       env,
       chatId,
-      [`<b>Cursor agent started</b>`, escapeHtml(rest.slice(0, 200)), link].join('\n'),
+      [`<b>Master_Splinter is on it</b>`, escapeHtml(rest.slice(0, 200))].join('\n'),
       { parseMode: 'HTML' },
     );
 
-    executionCtx.waitUntil(pollAndNotify(env, chatId, agentId, runId, agentUrl));
+    executionCtx.waitUntil(pollAndNotify(env, chatId, agentId, runId));
   } catch (error) {
     await sendMessage(
       env,
       chatId,
-      `Failed to start agent: ${escapeHtml(error instanceof Error ? error.message : String(error))}`,
+      `Failed to start: ${escapeHtml(error instanceof Error ? error.message : String(error))}`,
       { parseMode: 'HTML' },
     );
   }
