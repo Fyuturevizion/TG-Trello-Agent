@@ -33,7 +33,7 @@
     "CURSOR_AGENT_AUTO_PR": "true",
     "CURSOR_AGENT_FAST": "true",
     "CURSOR_AGENT_MAX_SESSION_PROMPTS": "8",
-    "TELEGRAM_BLOCKED_USERNAMES": "Connor13all"
+    "TELEGRAM_ADMIN_USERNAMES": "Connor13all"
   },
   "triggers": {
     "crons": ["0 8 * * *"]

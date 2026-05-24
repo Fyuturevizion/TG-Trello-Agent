@@ -39,6 +39,8 @@ export interface Env {
   TELEGRAM_BLOCKED_USERNAMES?: string;
   /** Comma-separated IDs allowed to run admin commands (e.g. /setup). */
   TELEGRAM_ADMIN_USER_IDS?: string;
+  /** Comma-separated admin usernames for /setup and /master-splinter (with or without @). */
+  TELEGRAM_ADMIN_USERNAMES?: string;
   TRELLO_API_KEY: string;
   TRELLO_TOKEN: string;
   TRELLO_INBOX_LIST_ID: string;

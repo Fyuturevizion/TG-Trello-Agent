@@ -183,10 +183,14 @@ export function isAllowedUser(env: Env, userId: number): boolean {
   return ids.includes(String(userId));
 }
 
-/** Who may change bot setup (/setup). Falls back to TELEGRAM_ALLOWED_USER_IDS if unset. */
-export function isAdminUser(env: Env, userId: number): boolean {
+/** Who may change bot setup (/setup) and /master-splinter. Falls back to TELEGRAM_ALLOWED_USER_IDS if unset. */
+export function isAdminUser(env: Env, userId: number, username?: string): boolean {
   const adminIds = parseUserIdList(env.TELEGRAM_ADMIN_USER_IDS);
-  const ids = adminIds.length > 0 ? adminIds : parseUserIdList(env.TELEGRAM_ALLOWED_USER_IDS);
-  if (ids.length === 0) return false;
-  return ids.includes(String(userId));
+  const adminNames = parseUsernameList(env.TELEGRAM_ADMIN_USERNAMES);
+  if (adminIds.includes(String(userId))) return true;
+  if (username && adminNames.includes(username.toLowerCase())) return true;
+  if (adminIds.length > 0 || adminNames.length > 0) return false;
+  const allowedIds = parseUserIdList(env.TELEGRAM_ALLOWED_USER_IDS);
+  if (allowedIds.length === 0) return false;
+  return allowedIds.includes(String(userId));
 }
