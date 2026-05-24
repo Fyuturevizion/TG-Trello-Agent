@@ -52,7 +52,7 @@ const COMMANDS = [
   { command: 'bug', description: 'Shortcut: report a bug' },
   { command: 'wishlist', description: 'Shortcut: submit a wishlist item' },
   { command: 'help', description: 'Show available commands' },
-  { command: 'agent', description: 'Admin: Cursor agent to update triage bot' },
+  { command: 'master_splinter', description: 'Admin: Master_Splinter maintains triage bot' },
 ];
 
 async function main(): Promise<void> {

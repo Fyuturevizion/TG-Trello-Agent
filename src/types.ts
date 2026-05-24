@@ -56,13 +56,17 @@ export interface Env {
   TRELLO_ARCHIVE_LIST_IDS?: string;
   SESSION_TTL_SECONDS?: string;
   MAX_PHOTOS?: string;
-  /** Cursor Cloud Agents API key (admin /agent commands). */
+  /** Cursor Cloud Agents API key (admin /master-splinter commands). */
   CURSOR_API_KEY?: string;
   CURSOR_AGENT_REPO_URL?: string;
   CURSOR_AGENT_REPO_REF?: string;
   CURSOR_AGENT_MODEL?: string;
   /** Set to "true" to open PRs when the cloud agent finishes. */
   CURSOR_AGENT_AUTO_PR?: string;
+  /** Set to "false" to disable fast mode (default: fast on). */
+  CURSOR_AGENT_FAST?: string;
+  /** Prompts before rotating to a fresh agent session (default 8). */
+  CURSOR_AGENT_MAX_SESSION_PROMPTS?: string;
 }
 
 export interface TelegramUser {

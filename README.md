@@ -21,7 +21,7 @@ One channel message is posted per report. You’ll get updates when the card is 
 | `/wishlist` | Open form (wishlist) |
 | `/help` | Help |
 
-Admin-only: `/setup` (refresh channel buttons), `/agent` (maintain this project).
+Admin-only: `/setup` (refresh channel buttons), `/master-splinter` (maintain this project).
 
 ## Questions
 
