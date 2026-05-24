@@ -51,7 +51,7 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
   }
 
   if (command === '/setup') {
-    if (!isAdminUser(env, userId, message.from?.username)) {
+    if (!isAdminUser(env, userId)) {
       await sendMessage(env, chatId, 'Only the bot admin can run /setup.');
       return;
     }

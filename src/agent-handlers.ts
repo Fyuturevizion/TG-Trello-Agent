@@ -210,7 +210,7 @@ export async function handleAgentCommand(
 
   const rest = text.slice(prefix.length).trim();
 
-  if (!isAdminUser(env, userId, message.from?.username)) {
+  if (!isAdminUser(env, userId)) {
     if (isBlockedUser(env, userId, message.from?.username)) {
       await sendMessage(env, chatId, 'You are not permitted to use this bot.');
       return true;

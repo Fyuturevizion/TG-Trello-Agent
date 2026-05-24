@@ -139,7 +139,7 @@ async function processUpdate(
     }
 
     const inQaChannel = isAllowedChat(env, message.chat.id, message.chat.type);
-    const adminDm = message.chat.type === 'private' && isAdminUser(env, userId, from.username);
+    const adminDm = message.chat.type === 'private' && isAdminUser(env, userId);
     if (!inQaChannel && !adminDm) return;
 
     if (await handleAgentCommand(env, message, executionCtx)) return;
