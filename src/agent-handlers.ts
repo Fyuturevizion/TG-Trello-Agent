@@ -18,7 +18,7 @@ import {
 } from './cursor-api';
 import { buildIntruderReply, recordIntruderAttempt } from './agent-intruder';
 import { escapeHtml } from './telegram-format';
-import { isAdminUser, normalizeCommand, sendMessage } from './telegram';
+import { isAdminUser, isBlockedUser, normalizeCommand, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
 
 const POLL_MS = 5000;
@@ -211,6 +211,10 @@ export async function handleAgentCommand(
   const rest = text.slice(prefix.length).trim();
 
   if (!isAdminUser(env, userId)) {
+    if (isBlockedUser(env, userId, message.from?.username)) {
+      await sendMessage(env, chatId, 'You are not permitted to use this bot.');
+      return true;
+    }
     const record = await recordIntruderAttempt(env, userId);
     await sendMessage(
       env,

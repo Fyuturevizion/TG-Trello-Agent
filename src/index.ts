@@ -5,7 +5,7 @@ import { handleBotMessage, postChannelTriggers } from './bot-handlers';
 import { runWebhookWatchdog } from './cron';
 import { isDuplicateUpdate } from './idempotency';
 import { handleTrelloWebhook } from './trello-events';
-import { isAdminUser, isAllowedChat, normalizeCommand, sendMessage } from './telegram';
+import { isAdminUser, isAllowedChat, isBlockedUser, normalizeCommand, sendMessage } from './telegram';
 import type { Env, TelegramUpdate } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -116,6 +116,11 @@ async function processUpdate(
     const from = message.from;
     const text = message.text?.trim() ?? '';
     const userId = from.id;
+
+    if (isBlockedUser(env, userId, from.username)) {
+      await sendMessage(env, message.chat.id, 'You are not permitted to use this bot.');
+      return;
+    }
 
     if (normalizeCommand(text) === '/chatid') {
       await sendMessage(

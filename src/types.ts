@@ -33,6 +33,10 @@ export interface Env {
   TELEGRAM_QA_CHAT_ID: string;
   /** Comma-separated Telegram user IDs allowed to use bot commands. */
   TELEGRAM_ALLOWED_USER_IDS?: string;
+  /** Comma-separated Telegram user IDs denied bot access. */
+  TELEGRAM_BLOCKED_USER_IDS?: string;
+  /** Comma-separated Telegram usernames denied bot access (with or without @). */
+  TELEGRAM_BLOCKED_USERNAMES?: string;
   /** Comma-separated IDs allowed to run admin commands (e.g. /setup). */
   TELEGRAM_ADMIN_USER_IDS?: string;
   TRELLO_API_KEY: string;

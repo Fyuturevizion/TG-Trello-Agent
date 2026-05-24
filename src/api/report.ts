@@ -5,6 +5,7 @@ import { announceNewCard, notifyReporterDm } from '../channel';
 import type { DeviceKey } from '../devices';
 import { isDeviceKey } from '../devices';
 import { validateInitData } from '../telegram-webapp';
+import { isBlockedUser } from '../telegram';
 import { addAttachment, createCard } from '../trello';
 import type { Env, ReportType } from '../types';
 
@@ -72,6 +73,10 @@ export async function handleReportSubmit(
   const auth = await validateInitData(body.initData, env.TELEGRAM_BOT_TOKEN);
   if (!auth) {
     return { ok: false, error: 'Invalid Telegram session', status: 401 };
+  }
+
+  if (isBlockedUser(env, auth.user.id, auth.user.username)) {
+    return { ok: false, error: 'Not permitted', status: 403 };
   }
 
   const maxPhotos = Math.min(Number(env.MAX_PHOTOS ?? '3') || 3, 10);

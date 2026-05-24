@@ -159,6 +159,23 @@ function parseUserIdList(raw: string | undefined): string[] {
   return raw.split(',').map((id) => id.trim()).filter(Boolean);
 }
 
+function parseUsernameList(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(',')
+    .map((name) => name.trim().replace(/^@/, '').toLowerCase())
+    .filter(Boolean);
+}
+
+/** Blocked users cannot use bot commands or submit reports via the Mini App. */
+export function isBlockedUser(env: Env, userId: number, username?: string): boolean {
+  const blockedIds = parseUserIdList(env.TELEGRAM_BLOCKED_USER_IDS);
+  if (blockedIds.includes(String(userId))) return true;
+  const blockedNames = parseUsernameList(env.TELEGRAM_BLOCKED_USERNAMES);
+  if (username && blockedNames.includes(username.toLowerCase())) return true;
+  return false;
+}
+
 /** Who may use /report, /help, etc. When unset, any member of the QA channel may. */
 export function isAllowedUser(env: Env, userId: number): boolean {
   const ids = parseUserIdList(env.TELEGRAM_ALLOWED_USER_IDS);
