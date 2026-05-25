@@ -4,8 +4,13 @@ import { saveCardReporter } from '../card-reporter';
 import { announceNewCard, notifyReporterDm } from '../channel';
 import type { DeviceKey } from '../devices';
 import { isDeviceKey } from '../devices';
-import { formatTrelloCardLink } from '../telegram-format';
+import {
+  formatBoardLine,
+  formatCardUpdateMessage,
+  formatReporterMention,
+} from '../telegram-format';
 import { isBlockedUser } from '../telegram';
+import { validateInitData } from '../telegram-webapp';
 import { addAttachment, createCard } from '../trello';
 import type { Env, ReportType } from '../types';
 
@@ -135,11 +140,20 @@ export async function handleReportSubmit(
   });
 
   try {
-    await notifyReporterDm(
-      env,
-      auth.user.id,
-      `Your triage card was created in Trello INBOX:\n${formatTrelloCardLink(body.title, card.shortUrl)}`,
-    );
+    const mention = formatReporterMention({
+      reporterId: auth.user.id,
+      reporterUsername: auth.user.username,
+      reporterFirstName: auth.user.first_name,
+    });
+    const dmText = formatCardUpdateMessage({
+      headline: 'Your triage card was created',
+      title: body.title,
+      boardLine: formatBoardLine(env),
+      listLine: 'List: INBOX',
+      shortUrl: card.shortUrl,
+      createdBy: mention,
+    }).join('\n');
+    await notifyReporterDm(env, auth.user.id, dmText);
   } catch {
     // DM may be blocked if user never started bot
   }

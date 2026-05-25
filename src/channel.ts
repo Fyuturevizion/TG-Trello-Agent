@@ -1,9 +1,8 @@
 import { browserLabel } from './browsers';
 import type { BrowserKey } from './browsers';
-import type { CardReporter } from './card-reporter';
 import { deviceDisplayLabel } from './devices';
 import type { DeviceKey } from './devices';
-import { escapeHtml, formatReporterMention, formatTrelloCardLink } from './telegram-format';
+import { escapeHtml, formatBoardLine, formatCardUpdateMessage, formatReporterMention } from './telegram-format';
 import { sendMessage } from './telegram';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
@@ -32,12 +31,15 @@ export async function announceNewCard(
     input.browser ? browserLabel(input.browser) : undefined,
   );
 
-  const text = [
-    `✅ New triage card — ${mention}`,
-    '',
-    `<b>${escapeHtml(REPORT_TYPE_LABELS[input.type])}</b> · ${escapeHtml(devicePart)}`,
-    formatTrelloCardLink(input.title, input.shortUrl),
-  ].join('\n');
+  const text = formatCardUpdateMessage({
+    headline: 'New triage card',
+    title: input.title,
+    subtitle: `<b>${escapeHtml(REPORT_TYPE_LABELS[input.type])}</b> · ${escapeHtml(devicePart)}`,
+    boardLine: formatBoardLine(env),
+    listLine: 'List: INBOX',
+    shortUrl: input.shortUrl,
+    createdBy: mention,
+  }).join('\n');
 
   await sendMessage(env, chatId, text, { parseMode: 'HTML' });
 }
@@ -45,18 +47,11 @@ export async function announceNewCard(
 export async function announceTrelloEvent(
   env: Env,
   lines: string[],
-  reporter?: CardReporter | null,
 ): Promise<void> {
   const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
   if (!Number.isFinite(chatId)) return;
 
-  let text = lines.join('\n');
-  if (reporter) {
-    const mention = formatReporterMention(reporter);
-    text = `${text}\n\nReporter: ${mention}`;
-  }
-
-  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  await sendMessage(env, chatId, lines.join('\n'), { parseMode: 'HTML' });
 }
 
 export async function notifyReporterDm(
