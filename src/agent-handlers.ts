@@ -17,6 +17,7 @@ import {
   isTerminalRunStatus,
 } from './cursor-api';
 import { buildIntruderReply, recordIntruderAttempt } from './agent-intruder';
+import { sendTestCardUpdate } from './channel';
 import { escapeHtml } from './telegram-format';
 import { isAdminUser, isBlockedUser, normalizeCommand, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
@@ -53,6 +54,7 @@ function helpText(): string {
     '/master-splinter cancel — cancel active run',
     '/master-splinter reset — forget session (fresh context next time)',
     '/master-splinter new &lt;prompt&gt; — force a new session',
+    '/master-splinter test — post a sample card update to the QA channel',
     '',
     '<b>Config</b>',
     '/master-splinter config — show settings',
@@ -220,6 +222,21 @@ export async function handleAgentCommand(
       env,
       chatId,
       buildIntruderReply(record, message.from?.username, message.from?.first_name),
+      { parseMode: 'HTML' },
+    );
+    return true;
+  }
+
+  if (rest === 'test') {
+    const posted = await sendTestCardUpdate(env);
+    if (!posted) {
+      await sendMessage(env, chatId, 'Could not post test message. Check TELEGRAM_QA_CHAT_ID is set.');
+      return true;
+    }
+    await sendMessage(
+      env,
+      chatId,
+      'Test card update posted to the QA channel. Tap <b>link to the card</b> there to confirm HTML links work.',
       { parseMode: 'HTML' },
     );
     return true;

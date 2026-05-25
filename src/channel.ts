@@ -44,6 +44,27 @@ export async function announceNewCard(
   await sendMessage(env, chatId, text, { parseMode: 'HTML' });
 }
 
+const TEST_CARD_URL = 'https://trello.com/c/8kTHpNjt';
+
+/** Admin-only sample notification for verifying HTML card links in the QA channel. */
+export async function sendTestCardUpdate(env: Env): Promise<boolean> {
+  const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
+  if (!Number.isFinite(chatId)) return false;
+
+  const text = formatCardUpdateMessage({
+    headline: 'List updated (test)',
+    title: '\'slice" changed to capital "Slice" in Gifting coming soon modal.',
+    boardLine: formatBoardLine(env, { name: 'Development' }),
+    listLine: 'List: Backlog → In Progress',
+    shortUrl: TEST_CARD_URL,
+    updatedBy: '@iainmckie',
+    createdBy: '@Connor13all',
+  }).join('\n');
+
+  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  return true;
+}
+
 export async function announceTrelloEvent(
   env: Env,
   lines: string[],
