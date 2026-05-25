@@ -14,6 +14,9 @@ export function formatTrelloCardLink(name: string, shortUrl?: string): string {
   if (!url) return safeName;
   return `<a href="${escapeHtml(url)}">${safeName}</a>`;
 }
+
+/** Mention reporter in QA channel (HTML parse mode). */
+export function formatReporterMention(reporter: {
   reporterId: number;
   reporterUsername?: string;
   reporterFirstName?: string;

@@ -138,7 +138,7 @@ export async function handleReportSubmit(
     await notifyReporterDm(
       env,
       auth.user.id,
-      formatTrelloCardLink(body.title, card.shortUrl),
+      `Your triage card was created in Trello INBOX:\n${formatTrelloCardLink(body.title, card.shortUrl)}`,
     );
   } catch {
     // DM may be blocked if user never started bot
