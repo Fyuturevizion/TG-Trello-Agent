@@ -14,7 +14,6 @@ interface TrelloWebhookPayload {
       board?: { id?: string; name?: string };
       boardSource?: { id?: string; name?: string };
       old?: { closed?: boolean };
-      member?: { fullName?: string; username?: string };
     };
     memberCreator?: { fullName?: string; username?: string };
   };
@@ -79,22 +78,6 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
   const cardId = data?.card?.id;
   const card = cardLabel(payload);
   const creator = creatorLabel(payload);
-
-  if (type === 'addMemberToCard' && data?.member) {
-    const assignee = escapeHtml(data.member.fullName ?? data.member.username ?? 'member');
-    const devBoard = isDevBoard(env, data.board?.id, data.board?.name);
-    const lines = [
-      devBoard ? '<b>Assigned on Development board</b>' : '<b>Card assigned</b>',
-      '',
-      assignee,
-      '→',
-      card,
-      '',
-      `Updated by ${creator}`,
-    ];
-    await notifyReporter(env, cardId, lines);
-    return;
-  }
 
   if (type === 'updateCard' && data?.card?.closed === true && data.old?.closed === false) {
     await notifyReporter(
