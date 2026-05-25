@@ -56,6 +56,27 @@ function isDevBoard(env: Env, boardId?: string, boardName?: string): boolean {
   return false;
 }
 
+function formatListMove(
+  listBefore?: { id?: string; name?: string },
+  listAfter?: { id?: string; name?: string },
+): string | undefined {
+  const from = listBefore?.name ? escapeHtml(listBefore.name) : undefined;
+  const to = listAfter?.name ? escapeHtml(listAfter.name) : undefined;
+  if (from && to) return `List: ${from} → ${to}`;
+  if (to) return `To list: ${to}`;
+  if (from) return `From list: ${from}`;
+  return undefined;
+}
+
+function formatBoardMove(
+  boardSource?: { name?: string },
+  boardDest?: { name?: string },
+): string {
+  const from = boardSource?.name ? escapeHtml(boardSource.name) : 'Support/Triage';
+  const to = boardDest?.name ? escapeHtml(boardDest.name) : 'another board';
+  return `Board: ${from} → ${to}`;
+}
+
 async function notifyReporter(
   env: Env,
   cardId: string | undefined,
@@ -90,26 +111,24 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
   }
 
   if (type === 'moveCardToBoard' && data?.board) {
-    const destBoard = escapeHtml(data.board.name ?? 'another board');
-    const sourceBoard = data.boardSource?.name
-      ? escapeHtml(data.boardSource.name)
-      : 'Support/Triage';
     const fromInbox =
       data.listBefore?.id && inboxListId(env) && data.listBefore.id === inboxListId(env);
+    const listMove = formatListMove(data.listBefore, data.listAfter);
 
     const lines = [
       isDevBoard(env, data.board.id, data.board.name)
         ? '<b>Moved to Development board</b>'
         : '<b>Moved to another board</b>',
       '',
-      `${sourceBoard} → ${destBoard}`,
+      formatBoardMove(data.boardSource, data.board),
+      ...(listMove ? [listMove] : []),
       '',
       card,
       '',
       `Moved by ${creator}`,
     ];
     if (fromInbox) {
-      lines.splice(2, 0, '<i>Left INBOX — card picked up for development</i>');
+      lines.splice(2, 0, '<i>Left INBOX, card picked up for development</i>');
     }
     await notifyReporter(env, cardId, lines);
     return;
@@ -119,27 +138,41 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
     (type === 'updateCard' || type === 'moveCardFromBoard' || type === 'moveCardToBoard') &&
     data?.listAfter
   ) {
-    const listName = escapeHtml(data.listAfter.name ?? 'another list');
-    const before = data.listBefore?.name ? escapeHtml(data.listBefore.name) : undefined;
     const doneId = env.TRELLO_DONE_LIST_ID?.trim();
     const isDone = doneId && data.listAfter.id === doneId;
     const leftInbox =
       data.listBefore?.id && inboxListId(env) && data.listBefore.id === inboxListId(env);
     const isArchive = data.listAfter.id && archiveListIds(env).has(data.listAfter.id);
+    const listMove = formatListMove(data.listBefore, data.listAfter);
 
     if (isDone || isArchive) {
       const status = isDone ? 'completed (DONE)' : 'archived';
       await notifyReporter(
         env,
         cardId,
-        [`<b>Card ${status}</b>`, '', card, '', `Updated by ${creator}`],
+        [
+          `<b>Card ${status}</b>`,
+          '',
+          ...(listMove ? [listMove] : []),
+          '',
+          card,
+          '',
+          `Updated by ${creator}`,
+        ],
         cardDmText(`Your triage card is ${status}:`, data.card?.name, data.card?.shortUrl),
       );
       return;
     }
 
-    const moveLine = before ? `Moved: ${before} → ${listName}` : `Moved to ${listName}`;
-    const lines = ['<b>List updated</b>', '', moveLine, '', card, '', `Updated by ${creator}`];
+    const lines = [
+      '<b>List updated</b>',
+      '',
+      ...(listMove ? [listMove] : []),
+      '',
+      card,
+      '',
+      `Updated by ${creator}`,
+    ];
     if (leftInbox) {
       lines.splice(2, 0, '<i>Left INBOX</i>');
     }
