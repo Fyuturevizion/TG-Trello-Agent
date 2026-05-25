@@ -3,7 +3,7 @@ import type { BrowserKey } from './browsers';
 import type { CardReporter } from './card-reporter';
 import { deviceDisplayLabel } from './devices';
 import type { DeviceKey } from './devices';
-import { escapeHtml, formatReporterMention } from './telegram-format';
+import { escapeHtml, formatReporterMention, formatTrelloCardLink } from './telegram-format';
 import { sendMessage } from './telegram';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
@@ -36,9 +36,7 @@ export async function announceNewCard(
     `✅ New triage card — ${mention}`,
     '',
     `<b>${escapeHtml(REPORT_TYPE_LABELS[input.type])}</b> · ${escapeHtml(devicePart)}`,
-    escapeHtml(input.title),
-    '',
-    escapeHtml(input.shortUrl),
+    formatTrelloCardLink(input.title, input.shortUrl),
   ].join('\n');
 
   await sendMessage(env, chatId, text, { parseMode: 'HTML' });

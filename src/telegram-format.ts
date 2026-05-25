@@ -7,8 +7,13 @@ export function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
-/** Mention reporter in QA channel (HTML parse mode). */
-export function formatReporterMention(reporter: {
+/** Clickable Trello card label for Telegram HTML messages. */
+export function formatTrelloCardLink(name: string, shortUrl?: string): string {
+  const safeName = escapeHtml(name);
+  const url = shortUrl?.trim();
+  if (!url) return safeName;
+  return `<a href="${escapeHtml(url)}">${safeName}</a>`;
+}
   reporterId: number;
   reporterUsername?: string;
   reporterFirstName?: string;

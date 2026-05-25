@@ -1,6 +1,6 @@
 import { getCardReporter } from './card-reporter';
 import { announceTrelloEvent, notifyReporterDm } from './channel';
-import { escapeHtml } from './telegram-format';
+import { escapeHtml, formatTrelloCardLink } from './telegram-format';
 import type { Env } from './types';
 
 interface TrelloWebhookPayload {
@@ -23,8 +23,11 @@ interface TrelloWebhookPayload {
 function cardLabel(payload: TrelloWebhookPayload): string {
   const card = payload.action?.data?.card;
   if (!card?.name) return 'A card';
-  const name = escapeHtml(card.name);
-  return card.shortUrl ? `${name}\n${escapeHtml(card.shortUrl)}` : name;
+  return formatTrelloCardLink(card.name, card.shortUrl);
+}
+
+function cardDmText(intro: string, name?: string, shortUrl?: string): string {
+  return `${intro}\n${formatTrelloCardLink(name ?? 'Card', shortUrl)}`;
 }
 
 function creatorLabel(payload: TrelloWebhookPayload): string {
@@ -98,7 +101,7 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
       env,
       cardId,
       ['<b>Card archived</b>', '', card, '', `Archived by ${creator}`],
-      `Your triage card was archived:\n${data.card.name ?? 'Card'}\n${data.card.shortUrl ?? ''}`,
+      cardDmText('Your triage card was archived:', data.card.name, data.card.shortUrl),
     );
     return;
   }
@@ -147,7 +150,7 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
         env,
         cardId,
         [`<b>Card ${status}</b>`, '', card, '', `Updated by ${creator}`],
-        `Your triage card is ${status}:\n${data.card?.name ?? 'Card'}\n${data.card?.shortUrl ?? ''}`,
+        cardDmText(`Your triage card is ${status}:`, data.card?.name, data.card?.shortUrl),
       );
       return;
     }

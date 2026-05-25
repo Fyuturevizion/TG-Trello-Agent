@@ -4,7 +4,7 @@ import { saveCardReporter } from '../card-reporter';
 import { announceNewCard, notifyReporterDm } from '../channel';
 import type { DeviceKey } from '../devices';
 import { isDeviceKey } from '../devices';
-import { validateInitData } from '../telegram-webapp';
+import { formatTrelloCardLink } from '../telegram-format';
 import { isBlockedUser } from '../telegram';
 import { addAttachment, createCard } from '../trello';
 import type { Env, ReportType } from '../types';
@@ -138,7 +138,7 @@ export async function handleReportSubmit(
     await notifyReporterDm(
       env,
       auth.user.id,
-      `Your triage card was created in Trello INBOX:\n${card.shortUrl}`,
+      formatTrelloCardLink(body.title, card.shortUrl),
     );
   } catch {
     // DM may be blocked if user never started bot
