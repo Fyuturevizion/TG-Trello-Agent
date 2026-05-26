@@ -219,6 +219,8 @@ select {
   font-size: 0.9375rem;
   color: var(--wlth-navy);
   background: var(--wlth-lavender-soft);
+  caret-color: var(--wlth-navy);
+  color-scheme: light;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -234,6 +236,7 @@ select:focus {
   border-color: var(--wlth-purple);
   box-shadow: 0 0 0 3px rgba(92, 79, 209, 0.2);
   background: var(--wlth-white);
+  caret-color: var(--wlth-navy);
 }
 
 textarea {
