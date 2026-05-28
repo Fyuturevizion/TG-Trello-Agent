@@ -167,6 +167,13 @@ body {
   letter-spacing: 0.04em;
 }
 
+.field-help {
+  margin: 8px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--wlth-text-muted);
+}
+
 /* Segmented control */
 .segmented {
   display: flex;

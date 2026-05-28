@@ -23,3 +23,7 @@ export function deviceDisplayLabel(key: DeviceKey, browserLabel?: string): strin
 export function isDeviceKey(value: string): value is DeviceKey {
   return value in TRELLO_DEVICES;
 }
+
+export function deviceNeedsAppVersion(device: DeviceKey): boolean {
+  return device === 'android' || device === 'iphone';
+}

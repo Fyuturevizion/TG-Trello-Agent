@@ -46,8 +46,24 @@ const fileLabel = document.getElementById('fileLabel');
 const deviceSelect = document.getElementById('device');
 const browserSection = document.getElementById('browserSection');
 const browserSelect = document.getElementById('browser');
+const appVersionSection = document.getElementById('appVersionSection');
+const appVersionInput = document.getElementById('appVersion');
 
 const DESKTOP_DEVICES = new Set(['apple_laptop', 'pc']);
+const MOBILE_DEVICES = new Set(['android', 'iphone']);
+
+function selectedReportType() {
+  return form.querySelector('input[name="type"]:checked')?.value ?? 'bug';
+}
+
+function syncAppVersionField() {
+  const isMobileBug = selectedReportType() === 'bug' && MOBILE_DEVICES.has(deviceSelect.value);
+  appVersionSection.hidden = !isMobileBug;
+  appVersionInput.required = isMobileBug;
+  if (!isMobileBug) {
+    appVersionInput.value = '';
+  }
+}
 
 function syncBrowserField() {
   const needsBrowser = DESKTOP_DEVICES.has(deviceSelect.value);
@@ -56,9 +72,13 @@ function syncBrowserField() {
   if (!needsBrowser) {
     browserSelect.value = '';
   }
+  syncAppVersionField();
 }
 
 deviceSelect.addEventListener('change', syncBrowserField);
+document.querySelectorAll('input[name="type"]').forEach((radio) => {
+  radio.addEventListener('change', syncAppVersionField);
+});
 syncBrowserField();
 
 ercNa.addEventListener('change', () => {
@@ -102,13 +122,19 @@ form.addEventListener('submit', async (e) => {
 
     const device = data.get('device');
     const browser = data.get('browser');
+    const reportType = data.get('type');
     if (DESKTOP_DEVICES.has(device) && !browser) {
       throw new Error('Please select a browser for Mac or PC.');
     }
 
+    const appVersion = String(data.get('appVersion') ?? '').trim();
+    if (reportType === 'bug' && MOBILE_DEVICES.has(device) && !appVersion) {
+      throw new Error('Please enter the app version for iPhone and Android bug reports.');
+    }
+
     const body = {
       initData: tg.initData,
-      type: data.get('type'),
+      type: reportType,
       device,
       title: data.get('title'),
       details: data.get('details'),
@@ -116,6 +142,7 @@ form.addEventListener('submit', async (e) => {
       photos,
     };
     if (browser) body.browser = browser;
+    if (appVersion) body.appVersion = appVersion;
 
     const res = await fetch('/api/report', {
       method: 'POST',

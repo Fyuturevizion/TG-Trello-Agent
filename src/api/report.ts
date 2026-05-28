@@ -3,7 +3,7 @@ import type { BrowserKey } from '../browsers';
 import { saveCardReporter } from '../card-reporter';
 import { announceNewCard, notifyReporterDm } from '../channel';
 import type { DeviceKey } from '../devices';
-import { isDeviceKey } from '../devices';
+import { deviceNeedsAppVersion, isDeviceKey } from '../devices';
 import {
   formatBoardLine,
   formatCardUpdateMessage,
@@ -19,6 +19,7 @@ interface ReportBody {
   type: ReportType;
   device: string;
   browser?: string;
+  appVersion?: string;
   title: string;
   details: string;
   ercAddress: string;
@@ -44,6 +45,14 @@ function parseBody(raw: unknown): ReportBody | null {
     browser = b.browser;
   }
 
+  let appVersion: string | undefined;
+  if (b.type === 'bug' && deviceNeedsAppVersion(b.device as DeviceKey)) {
+    if (typeof b.appVersion !== 'string' || !b.appVersion.trim()) return null;
+    appVersion = b.appVersion.trim().slice(0, 64);
+  } else if (typeof b.appVersion === 'string' && b.appVersion.trim()) {
+    appVersion = b.appVersion.trim().slice(0, 64);
+  }
+
   const photos = Array.isArray(b.photos)
     ? b.photos.filter((p): p is string => typeof p === 'string')
     : [];
@@ -52,6 +61,7 @@ function parseBody(raw: unknown): ReportBody | null {
     type: b.type,
     device: b.device,
     browser,
+    appVersion,
     title: b.title.trim().slice(0, 200),
     details: b.details.trim().slice(0, 4000),
     ercAddress: b.ercAddress.trim().slice(0, 128) || 'N/A',
@@ -95,6 +105,7 @@ export async function handleReportSubmit(
     type: body.type,
     device,
     browser,
+    appVersion: body.appVersion,
     title: body.title,
     details: body.details,
     ercAddress: body.ercAddress,

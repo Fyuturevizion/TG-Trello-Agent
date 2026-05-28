@@ -47,6 +47,7 @@ export function buildCardDescription(input: {
   type: ReportType;
   device: DeviceKey;
   browser?: BrowserKey;
+  appVersion?: string;
   title: string;
   details: string;
   ercAddress: string;
@@ -54,7 +55,7 @@ export function buildCardDescription(input: {
   reporterId: number;
   chatId: number;
 }): string {
-  const { type, device, browser, title, details, ercAddress, reporterUsername, reporterId, chatId } =
+  const { type, device, browser, appVersion, title, details, ercAddress, reporterUsername, reporterId, chatId } =
     input;
   const reporter = reporterUsername ? `@${reporterUsername}` : `user:${reporterId}`;
   const deviceLine = deviceDisplayLabel(device, browser ? browserLabel(browser) : undefined);
@@ -66,6 +67,9 @@ export function buildCardDescription(input: {
   ];
   if (browser) {
     lines.push(`**Browser:** ${browserLabel(browser)}`);
+  }
+  if (appVersion) {
+    lines.push(`**App version:** ${appVersion}`);
   }
   lines.push(
     `**ERC ADDRESS:** ${ercAddress}`,
@@ -138,6 +142,7 @@ export async function createCard(
     type: ReportType;
     device: DeviceKey;
     browser?: BrowserKey;
+    appVersion?: string;
     title: string;
     details: string;
     ercAddress: string;

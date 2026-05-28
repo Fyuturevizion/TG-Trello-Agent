@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="stylesheet" href="/styles.css?v=20260524-caret" />
+    <link rel="stylesheet" href="/styles.css?v=20260524-appversion" />
   </head>
   <body>
     <div class="page">
@@ -86,6 +86,23 @@
             </div>
           </section>
 
+          <section class="card" id="appVersionSection" hidden>
+            <label class="field-label" for="appVersion">
+              App version
+              <span class="hint">required</span>
+            </label>
+            <input
+              id="appVersion"
+              name="appVersion"
+              maxlength="64"
+              placeholder="e.g. 2.4.1 (build 123)"
+              aria-label="App version"
+            />
+            <p class="field-help">
+              Required for iPhone and Android bug reports. Use the version shown in the app Settings or the store listing.
+            </p>
+          </section>
+
           <section class="card">
             <label class="field-label" for="title">Card title</label>
             <input id="title" name="title" required maxlength="200" placeholder="Short summary" />
@@ -146,6 +163,6 @@
         </div>
       </div>
     </div>
-    <script src="/app.js?v=20260524-caret" type="module"></script>
+    <script src="/app.js?v=20260524-appversion" type="module"></script>
   </body>
 </html>
