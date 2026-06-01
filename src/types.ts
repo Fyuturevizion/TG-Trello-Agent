@@ -54,9 +54,11 @@ export interface Env {
   WEBAPP_URL?: string;
   TRELLO_BOARD_ID?: string;
   TRELLO_DONE_LIST_ID?: string;
+  /** Comma-separated list ids that trigger a test request DM to the reporter. */
+  TRELLO_REVIEW_LIST_IDS?: string;
   /** Board id when cards move off Support/Triage (e.g. Development). */
   TRELLO_DEV_BOARD_ID?: string;
-  /** Comma-separated list ids treated as archived/closed (optional). */
+  /** Comma-separated list ids treated as archived/closed (optional, no Telegram announce). */
   TRELLO_ARCHIVE_LIST_IDS?: string;
   SESSION_TTL_SECONDS?: string;
   MAX_PHOTOS?: string;

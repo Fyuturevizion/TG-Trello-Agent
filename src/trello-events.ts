@@ -26,6 +26,8 @@ interface TrelloWebhookPayload {
   };
 }
 
+const REVIEW_LIST_NAMES = new Set(['pwa review', 'mobile - review']);
+
 function cardTitle(payload: TrelloWebhookPayload): string {
   return payload.action?.data?.card?.name ?? 'A card';
 }
@@ -44,10 +46,25 @@ function inboxListId(env: Env): string | undefined {
   return env.TRELLO_INBOX_LIST_ID?.trim() || undefined;
 }
 
+function reviewListIds(env: Env): Set<string> {
+  const raw = env.TRELLO_REVIEW_LIST_IDS?.trim();
+  if (!raw) return new Set();
+  return new Set(raw.split(',').map((id) => id.trim()).filter(Boolean));
+}
+
 function archiveListIds(env: Env): Set<string> {
   const raw = env.TRELLO_ARCHIVE_LIST_IDS?.trim();
   if (!raw) return new Set();
   return new Set(raw.split(',').map((id) => id.trim()).filter(Boolean));
+}
+
+function isReviewList(
+  env: Env,
+  listAfter?: { id?: string; name?: string },
+): listAfter is { id?: string; name: string } {
+  if (!listAfter?.name) return false;
+  if (listAfter.id && reviewListIds(env).has(listAfter.id)) return true;
+  return REVIEW_LIST_NAMES.has(listAfter.name.trim().toLowerCase());
 }
 
 async function notifyCardUpdate(
@@ -74,6 +91,33 @@ async function notifyCardUpdate(
   }
 }
 
+async function notifyReporterTestRequest(
+  env: Env,
+  cardId: string | undefined,
+  input: {
+    title: string;
+    shortUrl?: string;
+    board?: { name?: string };
+    listAfter?: { id?: string; name?: string };
+    listBefore?: { id?: string; name?: string };
+    listName: string;
+  },
+): Promise<void> {
+  const reporter = cardId ? await getCardReporter(env, cardId) : null;
+  if (!reporter) return;
+
+  const dmLines = formatCardUpdateMessage({
+    headline: 'Please test this update',
+    title: input.title,
+    subtitle: `Your report was moved to <b>${escapeHtml(input.listName)}</b>. Please test the update and report back in the QA channel if anything still looks wrong.`,
+    boardLine: formatBoardLine(env, input.board),
+    listLine: formatListLine(input.listAfter, input.listBefore),
+    shortUrl: input.shortUrl,
+    createdBy: formatReporterMention(reporter),
+  });
+  await notifyReporterDm(env, reporter.reporterId, dmLines.join('\n'));
+}
+
 export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayload): Promise<void> {
   const action = payload.action;
   if (!action?.type) return;
@@ -86,19 +130,6 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
   const editor = updatedBy(payload);
 
   if (type === 'updateCard' && data?.card?.closed === true && data.old?.closed === false) {
-    await notifyCardUpdate(
-      env,
-      cardId,
-      {
-        headline: 'Card archived',
-        title,
-        boardLine: formatBoardLine(env, data.board),
-        listLine: formatListLine(data.list, undefined),
-        shortUrl,
-        updatedBy: editor,
-      },
-      'Your triage card was archived',
-    );
     return;
   }
 
@@ -124,19 +155,35 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
     const leftInbox =
       data.listBefore?.id && inboxListId(env) && data.listBefore.id === inboxListId(env);
 
-    if (isDone || isArchive) {
+    if (isArchive) {
+      return;
+    }
+
+    if (isReviewList(env, data.listAfter)) {
+      await notifyReporterTestRequest(env, cardId, {
+        title,
+        shortUrl,
+        board: data.board,
+        listAfter: data.listAfter,
+        listBefore: data.listBefore,
+        listName: data.listAfter.name,
+      });
+      return;
+    }
+
+    if (isDone) {
       await notifyCardUpdate(
         env,
         cardId,
         {
-          headline: isDone ? 'Card completed (DONE)' : 'Card archived',
+          headline: 'Card completed (DONE)',
           title,
           boardLine: formatBoardLine(env, data.board),
           listLine: formatListLine(data.listAfter, data.listBefore),
           shortUrl,
           updatedBy: editor,
         },
-        isDone ? 'Your triage card is completed (DONE)' : 'Your triage card is archived',
+        'Your triage card is completed (DONE)',
       );
       return;
     }
