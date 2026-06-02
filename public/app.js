@@ -48,21 +48,38 @@ const browserSection = document.getElementById('browserSection');
 const browserSelect = document.getElementById('browser');
 const appVersionSection = document.getElementById('appVersionSection');
 const appVersionInput = document.getElementById('appVersion');
+const appVersionInfo = document.getElementById('appVersionInfo');
+const appVersionInfoTip = document.getElementById('appVersionInfoTip');
 
 const DESKTOP_DEVICES = new Set(['apple_laptop', 'pc']);
 const MOBILE_DEVICES = new Set(['android', 'iphone']);
 
-function selectedReportType() {
-  return form.querySelector('input[name="type"]:checked')?.value ?? 'bug';
+function setAppVersionInfoOpen(open) {
+  if (!appVersionInfo || !appVersionInfoTip) return;
+  appVersionInfo.setAttribute('aria-expanded', open ? 'true' : 'false');
+  appVersionInfoTip.hidden = !open;
 }
 
 function syncAppVersionField() {
   const isMobileBug = selectedReportType() === 'bug' && MOBILE_DEVICES.has(deviceSelect.value);
   appVersionSection.hidden = !isMobileBug;
   appVersionInput.required = isMobileBug;
+  appVersionInput.setAttribute('aria-required', isMobileBug ? 'true' : 'false');
   if (!isMobileBug) {
     appVersionInput.value = '';
+    setAppVersionInfoOpen(false);
   }
+}
+
+if (appVersionInfo && appVersionInfoTip) {
+  appVersionInfo.addEventListener('click', () => {
+    const open = appVersionInfo.getAttribute('aria-expanded') !== 'true';
+    setAppVersionInfoOpen(open);
+  });
+}
+
+function selectedReportType() {
+  return form.querySelector('input[name="type"]:checked')?.value ?? 'bug';
 }
 
 function syncBrowserField() {
@@ -129,7 +146,8 @@ form.addEventListener('submit', async (e) => {
 
     const appVersion = String(data.get('appVersion') ?? '').trim();
     if (reportType === 'bug' && MOBILE_DEVICES.has(device) && !appVersion) {
-      throw new Error('Please enter the app version for iPhone and Android bug reports.');
+      setAppVersionInfoOpen(true);
+      throw new Error('App version number is required for iPhone and Android bug reports.');
     }
 
     const body = {

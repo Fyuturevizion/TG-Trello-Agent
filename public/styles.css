@@ -167,6 +167,56 @@ body {
   letter-spacing: 0.04em;
 }
 
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.field-label-row .field-label {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.info-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(92, 79, 209, 0.35);
+  border-radius: 50%;
+  padding: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  color: var(--wlth-purple);
+  background: var(--wlth-lavender-soft);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.info-icon:hover,
+.info-icon:focus-visible {
+  outline: none;
+  background: var(--wlth-lavender);
+  border-color: var(--wlth-purple);
+}
+
+.info-tooltip {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--wlth-navy);
+  background: var(--wlth-lavender);
+  border: 1px solid rgba(92, 79, 209, 0.2);
+  border-radius: 10px;
+}
+
 .field-help {
   margin: 8px 0 0;
   font-size: 0.8125rem;

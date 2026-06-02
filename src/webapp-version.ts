@@ -1,5 +1,5 @@
 /** Bump when Mini App HTML/CSS/JS changes — busts Telegram WebView cache. */
-export const WEBAPP_UI_VERSION = '20260524-appversion';
+export const WEBAPP_UI_VERSION = '20260524-appversion-info';
 
 export function webappUrlWithVersion(base: string, extra?: Record<string, string>): string {
   const url = new URL(base.replace(/\/$/, '') || 'https://example.invalid');
