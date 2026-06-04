@@ -4,6 +4,8 @@ import { dispatchTelegramUpdate } from './commands/dispatch';
 import { postChannelTriggers } from './bot-handlers';
 import { runPendingSplinterCron, runWebhookWatchdog } from './cron';
 import { pollSplinterRunOnce } from './splinter/poll-delivery';
+import { createSlackSenseiApp } from './slack-sensei';
+import { senseiHealthStatus } from './slack-sensei/health';
 import { isDuplicateUpdate } from './idempotency';
 import { handleTrelloWebhook } from './trello-events';
 import { sendMessage } from './telegram';
@@ -21,13 +23,17 @@ app.get('/health', (c) => {
       c.env.TRELLO_INBOX_LIST_ID &&
       c.env.WEBAPP_URL,
   );
+  const sensei = senseiHealthStatus(c.env);
   return c.json({
     ok: configured,
     webhook: c.env.WEBHOOK_URL ? 'configured' : 'unset',
     webapp: c.env.WEBAPP_URL ?? 'unset',
     service: 'wlth-tg-trello-triage',
+    slackSensei: sensei,
   });
 });
+
+app.route('/slack-sensei', createSlackSenseiApp());
 
 app.post('/api/report', async (c) => {
   try {

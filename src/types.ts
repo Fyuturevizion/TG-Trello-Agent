@@ -44,6 +44,16 @@ export interface Env {
   CURSOR_AGENT_MODEL?: string;
   /** Set to "true" to open PRs when the cloud agent finishes. */
   CURSOR_AGENT_AUTO_PR?: string;
+
+  /** Slack Sensei (Phase 2) */
+  SLACK_BOT_TOKEN?: string;
+  SLACK_SIGNING_SECRET?: string;
+  /** Channel ID for Sentry alerts (e.g. C01234567). */
+  SLACK_SENSEI_CHANNEL_ID?: string;
+  /** Path secret for POST /slack-sensei/sentry/:secret */
+  SENTRY_WEBHOOK_SECRET?: string;
+  /** Optional Trello list for Sensei cards; defaults to TRELLO_INBOX_LIST_ID. */
+  TRELLO_SENSEI_LIST_ID?: string;
 }
 
 export interface TelegramUser {

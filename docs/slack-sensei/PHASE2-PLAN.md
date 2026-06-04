@@ -43,14 +43,14 @@ Sentry ──► Slack (#sentry-alerts)
 
 ## Phased delivery
 
-### Phase 2a — Skeleton (week 1)
+### Phase 2a — Skeleton (week 1) ✅ in progress
 
-- [ ] Slack app: bot token, signing secret, Events API URL
-- [ ] `POST /slack/events` — verify signature, handle `app_mention`, slash command `/sensei`
-- [ ] `POST /sentry/webhook` — map issue → Slack parent message + Trello INBOX card
-- [ ] KV schema: `sensei:incident:{id}`
-- [ ] Reuse `cursor-api`, `poll-delivery` pattern for long runs
-- [ ] Prompt pack: repo list + “Slack Sensei” persona (no Telegram rules)
+- [x] Slack signature verification + `GET /slack-sensei/health`
+- [x] `POST /slack-sensei/events` — url_verification + signature check
+- [x] `POST /slack-sensei/sentry/:secret` — Slack message + Trello card (no agent)
+- [x] KV schema: `sensei:incident:sentry-{issueId}` — see `src/slack-sensei/types.ts`
+- [ ] Reuse `cursor-api`, `poll-delivery` pattern for long runs (Phase 2b)
+- [ ] Prompt pack: repo list + “Slack Sensei” persona (Phase 2b)
 
 ### Phase 2b — Agent + Trello loop (week 2)
 
