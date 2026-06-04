@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { handleReportSubmit } from './api/report';
-import { handleAgentCommand } from './agent-handlers';
-import { handleBotMessage, postChannelTriggers } from './bot-handlers';
-import { runWebhookWatchdog } from './cron';
+import { dispatchTelegramUpdate } from './commands/dispatch';
+import { postChannelTriggers } from './bot-handlers';
+import { runPendingSplinterCron, runWebhookWatchdog } from './cron';
+import { pollSplinterRunOnce } from './splinter/poll-delivery';
 import { isDuplicateUpdate } from './idempotency';
 import { handleTrelloWebhook } from './trello-events';
-import { isAdminUser, isAllowedChat, normalizeCommand, sendMessage } from './telegram';
+import { sendMessage } from './telegram';
 import type { Env, TelegramUpdate } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -79,6 +80,25 @@ app.post('/trello-webhook/:secret', async (c) => {
   return c.text('OK');
 });
 
+app.post('/internal/splinter-poll/:secret', async (c) => {
+  if (c.req.param('secret') !== c.env.TELEGRAM_WEBHOOK_SECRET) {
+    return c.text('Not found', 404);
+  }
+
+  c.executionCtx.waitUntil(
+    pollSplinterRunOnce(c.env, c.executionCtx).catch((error) => {
+      console.error(
+        JSON.stringify({
+          event: 'splinter_poll_handler_error',
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }),
+  );
+
+  return c.json({ ok: true });
+});
+
 app.post('/webhook/:secret', async (c) => {
   const secret = c.req.param('secret');
   if (secret !== c.env.TELEGRAM_WEBHOOK_SECRET) {
@@ -106,40 +126,7 @@ async function processUpdate(
   executionCtx: ExecutionContext,
 ): Promise<void> {
   try {
-    if (update.callback_query) {
-      return;
-    }
-
-    const message = update.message;
-    if (!message?.from) return;
-
-    const from = message.from;
-    const text = message.text?.trim() ?? '';
-    const userId = from.id;
-
-    if (normalizeCommand(text) === '/chatid') {
-      await sendMessage(
-        env,
-        message.chat.id,
-        [`Chat ID: ${message.chat.id}`, `Type: ${message.chat.type}`].join('\n'),
-      );
-      return;
-    }
-
-    if (normalizeCommand(text) === '/myid') {
-      const lines = [`Your user ID: ${userId}`];
-      if (from.username) lines.push(`Username: @${from.username}`);
-      await sendMessage(env, message.chat.id, lines.join('\n'));
-      return;
-    }
-
-    const inQaChannel = isAllowedChat(env, message.chat.id, message.chat.type);
-    const adminDm = message.chat.type === 'private' && isAdminUser(env, userId);
-    if (!inQaChannel && !adminDm) return;
-
-    if (await handleAgentCommand(env, message, executionCtx)) return;
-
-    await handleBotMessage(env, message);
+    await dispatchTelegramUpdate(env, update, executionCtx);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error(
@@ -212,7 +199,10 @@ export default {
     ctx: ExecutionContext,
   ): Promise<void> {
     ctx.waitUntil(
-      runWebhookWatchdog(env).catch((error) => {
+      Promise.all([
+        runPendingSplinterCron(env),
+        controller.cron === '0 8 * * *' ? runWebhookWatchdog(env) : Promise.resolve(),
+      ]).catch((error) => {
         console.error(
           JSON.stringify({
             event: 'cron_error',

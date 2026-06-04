@@ -7,7 +7,8 @@ import { escapeHtml, formatReporterMention } from './telegram-format';
 import { sendMessage } from './telegram';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
-import { webappUrlWithVersion } from './webapp-version';
+import { resolveBotUsername } from './bot-identity';
+import { parseQaChatIds } from './qa-chats';
 
 export async function announceNewCard(
   env: Env,
@@ -23,8 +24,8 @@ export async function announceNewCard(
     reporterFirstName?: string;
   },
 ): Promise<void> {
-  const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
-  if (!Number.isFinite(chatId)) return;
+  const chatIds = parseQaChatIds(env);
+  if (chatIds.length === 0) return;
 
   const mention = formatReporterMention(input);
   const devicePart = deviceDisplayLabel(
@@ -41,7 +42,9 @@ export async function announceNewCard(
     escapeHtml(input.shortUrl),
   ].join('\n');
 
-  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  for (const chatId of chatIds) {
+    await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  }
 }
 
 export async function announceTrelloEvent(
@@ -49,8 +52,8 @@ export async function announceTrelloEvent(
   lines: string[],
   reporter?: CardReporter | null,
 ): Promise<void> {
-  const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
-  if (!Number.isFinite(chatId)) return;
+  const chatIds = parseQaChatIds(env);
+  if (chatIds.length === 0) return;
 
   let text = lines.join('\n');
   if (reporter) {
@@ -58,7 +61,9 @@ export async function announceTrelloEvent(
     text = `${text}\n\nReporter: ${mention}`;
   }
 
-  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  for (const chatId of chatIds) {
+    await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  }
 }
 
 export async function notifyReporterDm(
@@ -73,33 +78,18 @@ export async function notifyReporterDm(
   }
 }
 
-export function webAppUrl(env: Env, query?: Record<string, string>): string {
-  const base = (env.WEBAPP_URL ?? '').replace(/\/$/, '');
-  if (!base) return '/';
-  return webappUrlWithVersion(base, query);
-}
-
-const BOT_USERNAME = 'WLTH_Triage_Bot';
-
 /** Opens via BotFather main Mini App (needs Configure Mini App URL + cache bust ?ui=). */
-export function channelTriggerKeyboard(_env: Env) {
-  return channelStartAppKeyboard();
+export function channelTriggerKeyboard(env: Env) {
+  return channelStartAppKeyboard(env);
 }
 
-export function channelStartAppKeyboard() {
+export function channelStartAppKeyboard(env: Env) {
+  const bot = resolveBotUsername(env);
   return {
     inline_keyboard: [
-      [{ text: 'Report bug', url: `https://t.me/${BOT_USERNAME}?startapp=bug` }],
-      [{ text: 'Wishlist', url: `https://t.me/${BOT_USERNAME}?startapp=wishlist` }],
+      [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
+      [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
     ],
   };
 }
 
-export function channelWebAppKeyboard(env: Env) {
-  return {
-    inline_keyboard: [
-      [{ text: 'Report bug', web_app: { url: webAppUrl(env, { type: 'bug' }) } }],
-      [{ text: 'Wishlist', web_app: { url: webAppUrl(env, { type: 'wishlist' }) } }],
-    ],
-  };
-}

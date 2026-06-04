@@ -1,40 +1,21 @@
-import type { DeviceKey } from './devices';
-
 export type ReportType = 'bug' | 'wishlist';
-
-export type FlowState =
-  | 'idle'
-  | 'type'
-  | 'device'
-  | 'pick_title'
-  | 'title'
-  | 'details'
-  | 'erc'
-  | 'erc_input'
-  | 'photos'
-  | 'confirm';
-
-export interface Session {
-  state: FlowState;
-  type?: ReportType;
-  device?: DeviceKey;
-  title?: string;
-  details?: string;
-  ercAddress?: string;
-  photoFileIds: string[];
-  promptMessageId?: number;
-}
 
 export interface Env {
   ASSETS: Fetcher;
   SESSIONS: KVNamespace;
   TELEGRAM_BOT_TOKEN: string;
+  /** @username without @ — used to detect unauthorized @tags. */
+  TELEGRAM_BOT_USERNAME?: string;
+  TELEGRAM_BOT_ID?: string;
   TELEGRAM_WEBHOOK_SECRET: string;
+  /** One or more QA supergroup IDs, comma-separated (e.g. -100111,-100222). */
   TELEGRAM_QA_CHAT_ID: string;
-  /** Comma-separated Telegram user IDs allowed to use bot commands. */
-  TELEGRAM_ALLOWED_USER_IDS?: string;
-  /** Comma-separated IDs allowed to run admin commands (e.g. /setup). */
+  /** Dojo keeper — only this user may run /dojo_grant with the secret word. */
+  TELEGRAM_DOJO_KEEPER_ID?: string;
+  /** Comma-separated fixed admins (Worker secret). No fallback list. */
   TELEGRAM_ADMIN_USER_IDS?: string;
+  /** Secret word for /dojo_grant (Worker secret DOJO_ADMIN_SECRET). */
+  DOJO_ADMIN_SECRET?: string;
   TRELLO_API_KEY: string;
   TRELLO_TOKEN: string;
   TRELLO_INBOX_LIST_ID: string;
@@ -69,6 +50,7 @@ export interface TelegramUser {
   id: number;
   username?: string;
   first_name?: string;
+  is_bot?: boolean;
 }
 
 export interface TelegramChat {
@@ -76,11 +58,21 @@ export interface TelegramChat {
   type: string;
 }
 
+export interface TelegramMessageEntity {
+  type: string;
+  offset: number;
+  length: number;
+  user?: TelegramUser;
+}
+
 export interface TelegramMessage {
   message_id: number;
   chat: TelegramChat;
   from?: TelegramUser;
   text?: string;
+  caption?: string;
+  entities?: TelegramMessageEntity[];
+  caption_entities?: TelegramMessageEntity[];
   photo?: Array<{ file_id: string; file_unique_id: string }>;
 }
 

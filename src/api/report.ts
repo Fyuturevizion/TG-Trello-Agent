@@ -4,6 +4,7 @@ import { saveCardReporter } from '../card-reporter';
 import { announceNewCard, notifyReporterDm } from '../channel';
 import type { DeviceKey } from '../devices';
 import { isDeviceKey } from '../devices';
+import { primaryQaChatId } from '../qa-chats';
 import { validateInitData } from '../telegram-webapp';
 import { addAttachment, createCard } from '../trello';
 import type { Env, ReportType } from '../types';
@@ -77,7 +78,7 @@ export async function handleReportSubmit(
   const maxPhotos = Math.min(Number(env.MAX_PHOTOS ?? '3') || 3, 10);
   const photos = (body.photos ?? []).slice(0, maxPhotos);
 
-  const qaChatId = Number(env.TELEGRAM_QA_CHAT_ID) || auth.user.id;
+  const qaChatId = primaryQaChatId(env) ?? auth.user.id;
   const device = body.device as DeviceKey;
   const browser = body.browser as BrowserKey | undefined;
 

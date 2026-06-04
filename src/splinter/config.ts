@@ -1,4 +1,6 @@
-import type { Env } from './types';
+import { MASTER_SPLINTER_VOICE, TELEGRAM_REPLY_FORMAT } from './prompts';
+import { MASTER_SPLINTER_DISPLAY } from './command';
+import type { Env } from '../types';
 
 const CONFIG_KEY = 'agent:config';
 const SESSION_KEY = 'agent:session';
@@ -22,10 +24,15 @@ export interface AgentSession {
 }
 
 const DEFAULT_INSTRUCTIONS = [
-  'You maintain the WLTH Telegram → Trello triage bot.',
-  'Stack: Cloudflare Worker (Hono), Mini App in public/, Trello + Telegram webhooks.',
-  'Make minimal, focused changes. Match existing code style. Deploy with wrangler.',
-].join(' ');
+  'You maintain the WLTH Telegram → Trello triage bot (Cloudflare Worker, Hono, Mini App in public/, webhooks).',
+  `You are ${MASTER_SPLINTER_DISPLAY}, the sensei of this dojo. Speak only as ${MASTER_SPLINTER_DISPLAY}. Never say /agent in Telegram replies. Never use em dashes (—) or en dashes (–).`,
+  'Make minimal, focused changes. Match existing code style.',
+  '',
+  MASTER_SPLINTER_VOICE,
+  '',
+  `Every Telegram reply is one conversational message from ${MASTER_SPLINTER_DISPLAY}, no "Answer" headings or report sections.`,
+  TELEGRAM_REPLY_FORMAT,
+].join('\n');
 
 export function defaultAgentConfig(env: Env): AgentConfig {
   return {

@@ -1,6 +1,5 @@
+import { cursorFetch } from './cursor-client';
 import type { Env } from './types';
-
-const CURSOR_API = 'https://api.cursor.com';
 
 export type CursorRunStatus =
   | 'CREATING'
@@ -13,9 +12,16 @@ export type CursorRunStatus =
 
 export interface CursorAgentSummary {
   id: string;
+  name?: string;
   status?: string;
   url?: string;
   latestRunId?: string;
+}
+
+export interface CursorGitBranch {
+  repoUrl?: string;
+  branch?: string;
+  prUrl?: string;
 }
 
 export interface CursorRun {
@@ -24,38 +30,10 @@ export interface CursorRun {
   status: CursorRunStatus;
   result?: string;
   durationMs?: number;
+  git?: { branches?: CursorGitBranch[] };
 }
 
-function apiKey(env: Env): string {
-  const key = env.CURSOR_API_KEY?.trim();
-  if (!key) throw new Error('CURSOR_API_KEY is not configured on the Worker');
-  return key;
-}
-
-function authHeader(env: Env): string {
-  const key = apiKey(env);
-  return `Basic ${btoa(`${key}:`)}`;
-}
-
-async function cursorFetch<T>(
-  env: Env,
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
-  const res = await fetch(`${CURSOR_API}${path}`, {
-    ...init,
-    headers: {
-      Authorization: authHeader(env),
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-  const body = await res.text();
-  if (!res.ok) {
-    throw new Error(`Cursor API ${path} (${res.status}): ${body.slice(0, 500)}`);
-  }
-  return JSON.parse(body) as T;
-}
+export { parseAgentId } from './cursor-client';
 
 export async function createCloudAgent(
   env: Env,
@@ -71,7 +49,7 @@ export async function createCloudAgent(
   return cursorFetch(env, '/v1/agents', {
     method: 'POST',
     body: JSON.stringify({
-      name: input.name?.slice(0, 100) ?? 'WLTH Triage bot update',
+      name: input.name?.slice(0, 100) ?? 'Master_Splinter, WLTH triage',
       prompt: { text: input.promptText },
       model: { id: input.modelId },
       repos: [{ url: input.repoUrl, startingRef: input.startingRef }],

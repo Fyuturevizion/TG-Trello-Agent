@@ -14,6 +14,8 @@
     "check:webapp": "tsx scripts/check-webapp.ts",
     "setup:channel": "tsx scripts/setup-channel.ts",
     "setup:menu": "tsx scripts/setup-menu-button.ts",
+    "setup:splinter-photo": "tsx scripts/setup-splinter-photo.ts",
+    "setup:bot-profile": "tsx scripts/setup-bot-profile.ts",
     "setup:trello-webhook": "tsx scripts/setup-trello-webhook.ts",
     "setup:all": "npm run setup:menu && npm run setup:channel && npm run setup:trello-webhook",
     "resolve-trello-ids": "tsx scripts/resolve-trello-ids.ts"

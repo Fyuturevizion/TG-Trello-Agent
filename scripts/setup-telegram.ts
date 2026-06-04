@@ -55,7 +55,7 @@ const PUBLIC_COMMANDS = [
 ];
 
 const ADMIN_COMMANDS = [
-  { command: 'master_splinter', description: 'Admin: Master_Splinter maintainer' },
+  { command: 'master_splinter', description: 'Admin: Master Splinter, maintain triage bot' },
 ];
 
 async function main(): Promise<void> {

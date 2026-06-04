@@ -1,3 +1,4 @@
+import { isQaChat, parseQaChatIds } from './qa-chats';
 import type { Env } from './types';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -64,41 +65,31 @@ export async function editMessageText(
   messageId: number,
   text: string,
   replyMarkup?: ReplyMarkup,
+  parseMode?: 'HTML' | 'Markdown',
 ): Promise<void> {
   await telegramRequest(env, 'editMessageText', {
     chat_id: chatId,
     message_id: messageId,
     text,
+    parse_mode: parseMode,
     reply_markup: replyMarkup,
   });
 }
 
-export async function answerCallbackQuery(
-  env: Env,
-  callbackQueryId: string,
-  text?: string,
-): Promise<void> {
-  await telegramRequest(env, 'answerCallbackQuery', {
-    callback_query_id: callbackQueryId,
-    text,
-    show_alert: false,
+export type ChatAction = 'typing' | 'upload_photo' | 'record_video' | 'upload_video';
+
+export async function sendChatAction(env: Env, chatId: number, action: ChatAction): Promise<void> {
+  await telegramRequest(env, 'sendChatAction', {
+    chat_id: chatId,
+    action,
   });
 }
 
-export async function getFilePath(env: Env, fileId: string): Promise<string> {
-  const result = await telegramRequest<{ file_path: string }>(env, 'getFile', {
-    file_id: fileId,
+export async function deleteMessage(env: Env, chatId: number, messageId: number): Promise<void> {
+  await telegramRequest(env, 'deleteMessage', {
+    chat_id: chatId,
+    message_id: messageId,
   });
-  return result.file_path;
-}
-
-export async function downloadFile(env: Env, filePath: string): Promise<ArrayBuffer> {
-  const url = `${TELEGRAM_API}/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to download Telegram file: ${response.status}`);
-  }
-  return response.arrayBuffer();
 }
 
 export function inlineKeyboard(rows: Array<Array<InlineButton>>): InlineKeyboard {
@@ -146,30 +137,10 @@ export async function setWebhook(env: Env, webhookUrl: string): Promise<void> {
 }
 
 export function isAllowedChat(env: Env, chatId: number, chatType?: string): boolean {
-  const allowed = env.TELEGRAM_QA_CHAT_ID?.trim();
-  if (allowed) {
-    return String(chatId) === allowed;
-  }
+  const ids = parseQaChatIds(env);
+  if (ids.length > 0) return isQaChat(env, chatId);
   // Fallback if unset: any group/supergroup/channel the bot is in
   return chatType === 'group' || chatType === 'supergroup' || chatType === 'channel';
 }
 
-function parseUserIdList(raw: string | undefined): string[] {
-  if (!raw?.trim()) return [];
-  return raw.split(',').map((id) => id.trim()).filter(Boolean);
-}
-
-/** Who may use /report, /help, etc. When unset, any member of the QA channel may. */
-export function isAllowedUser(env: Env, userId: number): boolean {
-  const ids = parseUserIdList(env.TELEGRAM_ALLOWED_USER_IDS);
-  if (ids.length === 0) return true;
-  return ids.includes(String(userId));
-}
-
-/** Who may change bot setup (/setup). Falls back to TELEGRAM_ALLOWED_USER_IDS if unset. */
-export function isAdminUser(env: Env, userId: number): boolean {
-  const adminIds = parseUserIdList(env.TELEGRAM_ADMIN_USER_IDS);
-  const ids = adminIds.length > 0 ? adminIds : parseUserIdList(env.TELEGRAM_ALLOWED_USER_IDS);
-  if (ids.length === 0) return false;
-  return ids.includes(String(userId));
-}
+export { isAdminUser, isDojoKeeper } from './dojo-access';

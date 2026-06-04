@@ -101,7 +101,7 @@ function findDevBoard(boards: TrelloBoard[], env: Record<string, string>): Trell
 }
 
 async function main(): Promise<void> {
-  const env = { ...loadEnv(), ...process.env };
+  const env: Record<string, string> = { ...loadEnv(), ...process.env } as Record<string, string>;
   const key = env.TRELLO_API_KEY;
   const token = env.TRELLO_TOKEN;
   const triageBoardId = env.TRELLO_BOARD_ID ?? '6682b4ab48fd9e545c9c8f55';
