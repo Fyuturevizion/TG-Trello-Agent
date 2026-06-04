@@ -16,7 +16,8 @@
     "setup:menu": "tsx scripts/setup-menu-button.ts",
     "setup:trello-webhook": "tsx scripts/setup-trello-webhook.ts",
     "setup:all": "npm run setup:menu && npm run setup:channel && npm run setup:trello-webhook",
-    "resolve-trello-ids": "tsx scripts/resolve-trello-ids.ts"
+    "resolve-trello-ids": "tsx scripts/resolve-trello-ids.ts",
+    "ensure-native-app-device": "tsx scripts/ensure-native-app-option.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

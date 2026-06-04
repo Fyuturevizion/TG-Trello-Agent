@@ -15,15 +15,9 @@ export const TRELLO_DEVICES: Record<
 };
 
 export function trelloDeviceOptionId(env: Env, device: DeviceKey): string {
-  if (device === 'native_app') {
-    const fromEnv = env.TRELLO_DEVICE_OPTION_NATIVE_APP?.trim();
-    if (fromEnv) return fromEnv;
-  }
   const optionId = TRELLO_DEVICES[device].optionId;
   if (!optionId) {
-    throw new Error(
-      'Native App device option is not configured. Set TRELLO_DEVICE_OPTION_NATIVE_APP on the Worker.',
-    );
+    throw new Error(`Trello device option is not configured for ${device}`);
   }
   return optionId;
 }

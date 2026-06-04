@@ -2,6 +2,7 @@ import type { BrowserKey } from './browsers';
 import { browserLabel } from './browsers';
 import type { DeviceKey } from './devices';
 import { deviceDisplayLabel, trelloDeviceOptionId } from './devices';
+import { ensureNativeAppDeviceOptionId } from './trello-device-options';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
 
@@ -129,12 +130,19 @@ async function setTextCustomField(
   }
 }
 
+async function resolveDeviceOptionId(env: Env, device: DeviceKey): Promise<string> {
+  if (device === 'native_app') {
+    return ensureNativeAppDeviceOptionId(env);
+  }
+  return trelloDeviceOptionId(env, device);
+}
+
 export async function setCardCustomFields(
   env: Env,
   cardId: string,
   input: { device: DeviceKey; ercAddress: string },
 ): Promise<void> {
-  const deviceOptionId = trelloDeviceOptionId(env, input.device);
+  const deviceOptionId = await resolveDeviceOptionId(env, input.device);
   await setListCustomField(env, cardId, deviceFieldId(env), deviceOptionId);
   await setTextCustomField(env, cardId, ercFieldId(env), input.ercAddress);
 }
