@@ -365,6 +365,86 @@ select {
   color: var(--wlth-text-muted);
 }
 
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 26, 46, 0.45);
+}
+
+.modal-panel {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  margin: 0;
+  z-index: 1;
+}
+
+.modal-title {
+  margin: 0 0 10px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--wlth-navy);
+}
+
+.modal-copy {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--wlth-text-muted);
+}
+
+.modal-check {
+  margin-bottom: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-primary,
+.btn-secondary {
+  flex: 1;
+  border-radius: var(--wlth-radius-sm);
+  padding: 12px 14px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  color: var(--wlth-white);
+  background: linear-gradient(135deg, var(--wlth-purple) 0%, var(--wlth-purple-dark) 100%);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  color: var(--wlth-navy);
+  background: var(--wlth-lavender-soft);
+  border: 1px solid var(--wlth-border);
+}
+
 /* Submit */
 .submit-bar {
   position: fixed;

@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="stylesheet" href="/styles.css?v=20260524-appversion-info" />
+    <link rel="stylesheet" href="/styles.css?v=20260524-native-app" />
   </head>
   <body>
     <div class="page">
@@ -62,9 +62,11 @@
               <select name="device" id="device" required aria-label="Device">
                 <option value="android">Android Mobile</option>
                 <option value="iphone">iPhone</option>
+                <option value="native_app">Native App (iOS and Android)</option>
                 <option value="apple_laptop">Apple Laptop</option>
                 <option value="pc">PC</option>
               </select>
+            <input type="hidden" name="nativeAppConfirmed" id="nativeAppConfirmed" value="" />
             </div>
           </section>
 
@@ -165,6 +167,24 @@
         </footer>
       </main>
 
+      <div id="nativeAppModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="nativeAppModalTitle">
+        <div class="modal-backdrop" id="nativeAppModalBackdrop"></div>
+        <div class="modal-panel card">
+          <h2 id="nativeAppModalTitle" class="modal-title">Native App</h2>
+          <p class="modal-copy">
+            Choose this for UI or UX issues that affect both the iPhone and Android apps.
+          </p>
+          <label class="check-row modal-check">
+            <input type="checkbox" id="nativeAppConfirmCheck" />
+            <span>I confirm this issue affects both native apps (iOS and Android).</span>
+          </label>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="nativeAppModalCancel">Cancel</button>
+            <button type="button" class="btn-primary" id="nativeAppModalContinue" disabled>Continue</button>
+          </div>
+        </div>
+      </div>
+
       <div id="fallback" class="fallback" hidden>
         <div class="card">
           <h1>Open in Telegram</h1>
@@ -176,6 +196,6 @@
         </div>
       </div>
     </div>
-    <script src="/app.js?v=20260524-appversion-info" type="module"></script>
+    <script src="/app.js?v=20260524-native-app" type="module"></script>
   </body>
 </html>

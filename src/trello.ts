@@ -1,7 +1,7 @@
 import type { BrowserKey } from './browsers';
 import { browserLabel } from './browsers';
 import type { DeviceKey } from './devices';
-import { deviceDisplayLabel, TRELLO_DEVICES } from './devices';
+import { deviceDisplayLabel, trelloDeviceOptionId } from './devices';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
 
@@ -71,6 +71,9 @@ export function buildCardDescription(input: {
   if (appVersion) {
     lines.push(`**App version:** ${appVersion}`);
   }
+  if (device === 'native_app') {
+    lines.push('**Scope:** Both native apps (iOS and Android)');
+  }
   lines.push(
     `**ERC ADDRESS:** ${ercAddress}`,
     `**Channel:** QA (${chatId})`,
@@ -131,8 +134,8 @@ export async function setCardCustomFields(
   cardId: string,
   input: { device: DeviceKey; ercAddress: string },
 ): Promise<void> {
-  const deviceOption = TRELLO_DEVICES[input.device];
-  await setListCustomField(env, cardId, deviceFieldId(env), deviceOption.optionId);
+  const deviceOptionId = trelloDeviceOptionId(env, input.device);
+  await setListCustomField(env, cardId, deviceFieldId(env), deviceOptionId);
   await setTextCustomField(env, cardId, ercFieldId(env), input.ercAddress);
 }
 

@@ -20,6 +20,7 @@ interface ReportBody {
   device: string;
   browser?: string;
   appVersion?: string;
+  nativeAppConfirmed?: boolean;
   title: string;
   details: string;
   ercAddress: string;
@@ -51,6 +52,11 @@ function parseBody(raw: unknown): ReportBody | null {
     appVersion = b.appVersion.trim().slice(0, 64);
   } else if (typeof b.appVersion === 'string' && b.appVersion.trim()) {
     appVersion = b.appVersion.trim().slice(0, 64);
+  }
+
+  if (b.device === 'native_app') {
+    const confirmed = b.nativeAppConfirmed === true || b.nativeAppConfirmed === 'true';
+    if (!confirmed) return null;
   }
 
   const photos = Array.isArray(b.photos)

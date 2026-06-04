@@ -49,6 +49,8 @@ export interface Env {
   TRELLO_LABEL_ANDROID?: string;
   TRELLO_LABEL_WEB?: string;
   TRELLO_CUSTOM_FIELD_DEVICE?: string;
+  /** Trello Device custom-field option id for "Native App" (both iOS and Android). */
+  TRELLO_DEVICE_OPTION_NATIVE_APP?: string;
   TRELLO_CUSTOM_FIELD_ERC?: string;
   WEBHOOK_URL?: string;
   WEBAPP_URL?: string;
