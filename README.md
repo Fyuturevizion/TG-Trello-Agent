@@ -21,7 +21,10 @@ One channel message is posted per report. You’ll get updates when the card is 
 | `/wishlist` | Open form (wishlist) |
 | `/help` | Help |
 
+## Admin
+
 Admin-only: `/setup` (refresh channel buttons), `/master-splinter` (maintain this project).
+`/master-splinter test-dm` — preview the “Please test this update” DM reporters get when a card moves to Mobile/PWA Review.
 
 ## Questions
 
