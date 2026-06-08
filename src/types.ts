@@ -12,7 +12,13 @@ export interface Env {
   TELEGRAM_QA_CHAT_ID: string;
   /** Dojo keeper — only this user may run /dojo_grant with the secret word. */
   TELEGRAM_DOJO_KEEPER_ID?: string;
-  /** Comma-separated fixed admins (Worker secret). No fallback list. */
+  /** Comma-separated Telegram user IDs allowed to use bot commands. */
+  TELEGRAM_ALLOWED_USER_IDS?: string;
+  /** Comma-separated Telegram user IDs denied bot access. */
+  TELEGRAM_BLOCKED_USER_IDS?: string;
+  /** Comma-separated Telegram usernames denied bot access (with or without @). */
+  TELEGRAM_BLOCKED_USERNAMES?: string;
+  /** Comma-separated IDs allowed to run admin commands (/setup, /master-splinter). */
   TELEGRAM_ADMIN_USER_IDS?: string;
   /** Secret word for /dojo_grant (Worker secret DOJO_ADMIN_SECRET). */
   DOJO_ADMIN_SECRET?: string;
@@ -26,14 +32,18 @@ export interface Env {
   TRELLO_LABEL_ANDROID?: string;
   TRELLO_LABEL_WEB?: string;
   TRELLO_CUSTOM_FIELD_DEVICE?: string;
+  /** Trello Device custom-field option id for "Native App" (both iOS and Android). */
+  TRELLO_DEVICE_OPTION_NATIVE_APP?: string;
   TRELLO_CUSTOM_FIELD_ERC?: string;
   WEBHOOK_URL?: string;
   WEBAPP_URL?: string;
   TRELLO_BOARD_ID?: string;
   TRELLO_DONE_LIST_ID?: string;
+  /** Comma-separated list ids that trigger a test request DM to the reporter. */
+  TRELLO_REVIEW_LIST_IDS?: string;
   /** Board id when cards move off Support/Triage (e.g. Development). */
   TRELLO_DEV_BOARD_ID?: string;
-  /** Comma-separated list ids treated as archived/closed (optional). */
+  /** Comma-separated list ids treated as archived/closed (optional, no Telegram announce). */
   TRELLO_ARCHIVE_LIST_IDS?: string;
   SESSION_TTL_SECONDS?: string;
   MAX_PHOTOS?: string;
@@ -44,8 +54,12 @@ export interface Env {
   CURSOR_AGENT_MODEL?: string;
   /** Set to "true" to open PRs when the cloud agent finishes. */
   CURSOR_AGENT_AUTO_PR?: string;
+  /** Set to "false" to disable fast mode (default: fast on). */
+  CURSOR_AGENT_FAST?: string;
+  /** Prompts before rotating to a fresh agent session (default 8). */
+  CURSOR_AGENT_MAX_SESSION_PROMPTS?: string;
 
-  /** Slack Sensei (Phase 2) */
+  /** Slack Sensei — separate from TG Splinter; see src/slack-sensei/ */
   SLACK_BOT_TOKEN?: string;
   SLACK_SIGNING_SECRET?: string;
   /** Channel ID for Sentry alerts (e.g. C01234567). */

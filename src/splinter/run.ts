@@ -1,5 +1,6 @@
 import {
   loadAgentSession,
+  modelParamsForConfig,
   saveAgentSession,
   type AgentConfig,
 } from './config';
@@ -24,7 +25,8 @@ export async function startMasterSplinterRun(
     try {
       const agent = await getAgent(env, session.agentId);
       if (agent.status === 'ACTIVE' || agent.status === 'CREATING') {
-        const { run } = await followUpAgent(env, session.agentId, promptText, config.modelId);
+        const model = { id: config.modelId, params: modelParamsForConfig(config) };
+        const { run } = await followUpAgent(env, session.agentId, promptText, model);
         return {
           agentId: session.agentId,
           runId: run.id,
@@ -41,6 +43,7 @@ export async function startMasterSplinterRun(
     repoUrl: config.repoUrl,
     startingRef: config.startingRef,
     modelId: config.modelId,
+    modelParams: modelParamsForConfig(config),
     autoCreatePR: config.autoCreatePR,
     name: runName,
   });
@@ -58,12 +61,14 @@ export async function persistRunSession(
   started: StartedCloudRun,
   lastPrompt: string,
 ): Promise<void> {
+  const existing = await loadAgentSession(env);
   await saveAgentSession(env, {
     agentId: started.agentId,
     latestRunId: started.runId,
     agentUrl: started.agentUrl,
     notifyChatId: chatId,
     lastPrompt: lastPrompt.slice(0, 500),
+    promptCount: (existing?.promptCount ?? 0) + 1,
     updatedAt: new Date().toISOString(),
   });
 }

@@ -23,6 +23,7 @@ import {
   handleMasterSplinterReset,
   handleMasterSplinterStatus,
 } from './subcommands';
+import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText } from '../telegram-message';
 import { escapeHtml } from '../telegram-format';
@@ -43,6 +44,7 @@ async function runMasterSplinterPrompt(
   chatId: number,
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
+  userId?: number,
 ): Promise<void> {
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
@@ -80,6 +82,42 @@ async function runMasterSplinterPrompt(
 
   if (rest.startsWith('config')) {
     await handleMasterSplinterConfig(env, chatId, rest.slice('config'.length).trim());
+    return;
+  }
+
+  if (rest === 'test') {
+    const posted = await sendTestCardUpdate(env);
+    if (!posted) {
+      await sendMessage(env, chatId, 'Could not post test message. Check TELEGRAM_QA_CHAT_ID is set.');
+      return;
+    }
+    await sendMessage(
+      env,
+      chatId,
+      'Test card update posted to the QA channel. Tap <b>link to the card</b> there to confirm HTML links work.',
+      { parseMode: 'HTML' },
+    );
+    return;
+  }
+
+  if (rest === 'test-dm' || rest === 'test dm') {
+    if (!userId) return;
+    try {
+      await sendTestReviewDm(env, userId);
+      await sendMessage(
+        env,
+        chatId,
+        'Sample review DM sent to your private chat with the bot. Open our DM thread if you do not see it yet.',
+        { parseMode: 'HTML' },
+      );
+    } catch (error) {
+      await sendMessage(
+        env,
+        chatId,
+        `Could not send test DM. Start a private chat with the bot first (tap Start), then try again.\n${escapeHtml(error instanceof Error ? error.message : String(error))}`,
+        { parseMode: 'HTML' },
+      );
+    }
     return;
   }
 
@@ -164,7 +202,7 @@ export async function handleMasterSplinterCommand(
     return true;
   }
 
-  await runMasterSplinterPrompt(env, chatId, rest, executionCtx);
+  await runMasterSplinterPrompt(env, chatId, rest, executionCtx, userId);
   return true;
 }
 
@@ -179,7 +217,7 @@ export async function handleAdminSplinterChat(
   if (!isAdminSplinterPing(message, env)) return false;
 
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));
-  await runMasterSplinterPrompt(env, message.chat.id, rest, executionCtx);
+  await runMasterSplinterPrompt(env, message.chat.id, rest, executionCtx, userId);
   return true;
 }
 

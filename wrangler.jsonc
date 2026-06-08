@@ -31,6 +31,8 @@
     "CURSOR_AGENT_REPO_REF": "main",
     "CURSOR_AGENT_MODEL": "composer-2.5",
     "CURSOR_AGENT_AUTO_PR": "true",
+    "CURSOR_AGENT_FAST": "true",
+    "CURSOR_AGENT_MAX_SESSION_PROMPTS": "8",
     // Must match BotFather username exactly (no @). Update after Edit Username.
     "TELEGRAM_BOT_USERNAME": "WLTH_Triage_Bot",
     // Only this Telegram user may promote admins via /dojo_grant + secret word

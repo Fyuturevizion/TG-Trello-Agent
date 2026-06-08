@@ -79,6 +79,7 @@ export async function handleMasterSplinterLink(
       latestRunId: undefined,
       agentUrl: agent.url,
       notifyChatId: chatId,
+      promptCount: 0,
       updatedAt: new Date().toISOString(),
     });
 

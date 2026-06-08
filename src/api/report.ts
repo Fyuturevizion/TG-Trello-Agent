@@ -3,8 +3,14 @@ import type { BrowserKey } from '../browsers';
 import { saveCardReporter } from '../card-reporter';
 import { announceNewCard, notifyReporterDm } from '../channel';
 import type { DeviceKey } from '../devices';
-import { isDeviceKey } from '../devices';
+import { deviceNeedsAppVersion, isDeviceKey } from '../devices';
 import { primaryQaChatId } from '../qa-chats';
+import {
+  formatBoardLine,
+  formatCardUpdateMessage,
+  formatReporterMention,
+} from '../telegram-format';
+import { isBlockedUser } from '../telegram';
 import { validateInitData } from '../telegram-webapp';
 import { addAttachment, createCard } from '../trello';
 import type { Env, ReportType } from '../types';
@@ -14,6 +20,8 @@ interface ReportBody {
   type: ReportType;
   device: string;
   browser?: string;
+  appVersion?: string;
+  nativeAppConfirmed?: boolean;
   title: string;
   details: string;
   ercAddress: string;
@@ -39,6 +47,19 @@ function parseBody(raw: unknown): ReportBody | null {
     browser = b.browser;
   }
 
+  let appVersion: string | undefined;
+  if (b.type === 'bug' && deviceNeedsAppVersion(b.device as DeviceKey)) {
+    if (typeof b.appVersion !== 'string' || !b.appVersion.trim()) return null;
+    appVersion = b.appVersion.trim().slice(0, 64);
+  } else if (typeof b.appVersion === 'string' && b.appVersion.trim()) {
+    appVersion = b.appVersion.trim().slice(0, 64);
+  }
+
+  if (b.device === 'native_app') {
+    const confirmed = b.nativeAppConfirmed === true || b.nativeAppConfirmed === 'true';
+    if (!confirmed) return null;
+  }
+
   const photos = Array.isArray(b.photos)
     ? b.photos.filter((p): p is string => typeof p === 'string')
     : [];
@@ -47,6 +68,7 @@ function parseBody(raw: unknown): ReportBody | null {
     type: b.type,
     device: b.device,
     browser,
+    appVersion,
     title: b.title.trim().slice(0, 200),
     details: b.details.trim().slice(0, 4000),
     ercAddress: b.ercAddress.trim().slice(0, 128) || 'N/A',
@@ -75,6 +97,10 @@ export async function handleReportSubmit(
     return { ok: false, error: 'Invalid Telegram session', status: 401 };
   }
 
+  if (isBlockedUser(env, auth.user.id, auth.user.username)) {
+    return { ok: false, error: 'Not permitted', status: 403 };
+  }
+
   const maxPhotos = Math.min(Number(env.MAX_PHOTOS ?? '3') || 3, 10);
   const photos = (body.photos ?? []).slice(0, maxPhotos);
 
@@ -86,6 +112,7 @@ export async function handleReportSubmit(
     type: body.type,
     device,
     browser,
+    appVersion: body.appVersion,
     title: body.title,
     details: body.details,
     ercAddress: body.ercAddress,
@@ -131,11 +158,20 @@ export async function handleReportSubmit(
   });
 
   try {
-    await notifyReporterDm(
-      env,
-      auth.user.id,
-      `Your triage card was created in Trello INBOX:\n${card.shortUrl}`,
-    );
+    const mention = formatReporterMention({
+      reporterId: auth.user.id,
+      reporterUsername: auth.user.username,
+      reporterFirstName: auth.user.first_name,
+    });
+    const dmText = formatCardUpdateMessage({
+      headline: 'Your triage card was created',
+      title: body.title,
+      boardLine: formatBoardLine(env),
+      listLine: 'List: INBOX',
+      shortUrl: card.shortUrl,
+      createdBy: mention,
+    }).join('\n');
+    await notifyReporterDm(env, auth.user.id, dmText);
   } catch {
     // DM may be blocked if user never started bot
   }

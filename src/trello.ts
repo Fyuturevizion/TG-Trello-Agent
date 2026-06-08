@@ -1,7 +1,8 @@
 import type { BrowserKey } from './browsers';
 import { browserLabel } from './browsers';
 import type { DeviceKey } from './devices';
-import { deviceDisplayLabel, TRELLO_DEVICES } from './devices';
+import { deviceDisplayLabel, trelloDeviceOptionId } from './devices';
+import { ensureNativeAppDeviceOptionId } from './trello-device-options';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
 
@@ -47,6 +48,7 @@ export function buildCardDescription(input: {
   type: ReportType;
   device: DeviceKey;
   browser?: BrowserKey;
+  appVersion?: string;
   title: string;
   details: string;
   ercAddress: string;
@@ -54,7 +56,7 @@ export function buildCardDescription(input: {
   reporterId: number;
   chatId: number;
 }): string {
-  const { type, device, browser, title, details, ercAddress, reporterUsername, reporterId, chatId } =
+  const { type, device, browser, appVersion, title, details, ercAddress, reporterUsername, reporterId, chatId } =
     input;
   const reporter = reporterUsername ? `@${reporterUsername}` : `user:${reporterId}`;
   const deviceLine = deviceDisplayLabel(device, browser ? browserLabel(browser) : undefined);
@@ -66,6 +68,12 @@ export function buildCardDescription(input: {
   ];
   if (browser) {
     lines.push(`**Browser:** ${browserLabel(browser)}`);
+  }
+  if (appVersion) {
+    lines.push(`**App version:** ${appVersion}`);
+  }
+  if (device === 'native_app') {
+    lines.push('**Scope:** Both native apps (iOS and Android)');
   }
   lines.push(
     `**ERC ADDRESS:** ${ercAddress}`,
@@ -122,13 +130,20 @@ async function setTextCustomField(
   }
 }
 
+async function resolveDeviceOptionId(env: Env, device: DeviceKey): Promise<string> {
+  if (device === 'native_app') {
+    return ensureNativeAppDeviceOptionId(env);
+  }
+  return trelloDeviceOptionId(env, device);
+}
+
 export async function setCardCustomFields(
   env: Env,
   cardId: string,
   input: { device: DeviceKey; ercAddress: string },
 ): Promise<void> {
-  const deviceOption = TRELLO_DEVICES[input.device];
-  await setListCustomField(env, cardId, deviceFieldId(env), deviceOption.optionId);
+  const deviceOptionId = await resolveDeviceOptionId(env, input.device);
+  await setListCustomField(env, cardId, deviceFieldId(env), deviceOptionId);
   await setTextCustomField(env, cardId, ercFieldId(env), input.ercAddress);
 }
 
@@ -138,6 +153,7 @@ export async function createCard(
     type: ReportType;
     device: DeviceKey;
     browser?: BrowserKey;
+    appVersion?: string;
     title: string;
     details: string;
     ercAddress: string;

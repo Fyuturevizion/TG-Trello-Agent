@@ -35,6 +35,20 @@ export interface CursorRun {
 
 export { parseAgentId } from './cursor-client';
 
+export interface ModelParam {
+  id: string;
+  value: string;
+}
+
+function buildModelPayload(
+  modelId: string,
+  modelParams?: ModelParam[],
+): { id: string; params?: ModelParam[] } {
+  const params = modelParams?.filter((p) => p.id && p.value);
+  if (params?.length) return { id: modelId, params };
+  return { id: modelId };
+}
+
 export async function createCloudAgent(
   env: Env,
   input: {
@@ -42,6 +56,7 @@ export async function createCloudAgent(
     repoUrl: string;
     startingRef: string;
     modelId: string;
+    modelParams?: ModelParam[];
     autoCreatePR: boolean;
     name?: string;
   },
@@ -51,7 +66,7 @@ export async function createCloudAgent(
     body: JSON.stringify({
       name: input.name?.slice(0, 100) ?? 'Master_Splinter, WLTH triage',
       prompt: { text: input.promptText },
-      model: { id: input.modelId },
+      model: buildModelPayload(input.modelId, input.modelParams),
       repos: [{ url: input.repoUrl, startingRef: input.startingRef }],
       autoCreatePR: input.autoCreatePR,
       skipReviewerRequest: true,
@@ -63,15 +78,19 @@ export async function followUpAgent(
   env: Env,
   agentId: string,
   promptText: string,
-  modelId?: string,
+  model?: { id: string; params?: ModelParam[] },
 ): Promise<{ run: CursorRun }> {
   return cursorFetch(env, `/v1/agents/${agentId}/runs`, {
     method: 'POST',
     body: JSON.stringify({
       prompt: { text: promptText },
-      ...(modelId ? { model: { id: modelId } } : {}),
+      ...(model ? { model: buildModelPayload(model.id, model.params) } : {}),
     }),
   });
+}
+
+export async function archiveAgent(env: Env, agentId: string): Promise<void> {
+  await cursorFetch(env, `/v1/agents/${agentId}/archive`, { method: 'POST' });
 }
 
 export async function getAgent(env: Env, agentId: string): Promise<CursorAgentSummary> {

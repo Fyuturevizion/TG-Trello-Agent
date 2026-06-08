@@ -2,7 +2,7 @@ import { DOJO_GRANT_CMD, handleDojoGrantCommand } from '../dojo-access';
 import { handleAdminSplinterChat, handleMasterSplinterCommand } from '../splinter/handlers';
 import { handleUnauthorizedSplinterSummon } from '../splinter/intruder';
 import { handleBotMessage } from '../bot-handlers';
-import { isAdminUser, isAllowedChat, sendMessage } from '../telegram';
+import { isAdminUser, isAllowedChat, isBlockedUser, sendMessage } from '../telegram';
 import { commandToken, isReporterCommand, isUtilityCommand } from './registry';
 import { resolveBotUsername } from '../bot-identity';
 import type { Env, TelegramMessage, TelegramUpdate } from '../types';
@@ -50,6 +50,10 @@ export async function dispatchTelegramMessage(
   const text = message.text?.trim() ?? '';
   const userId = message.from?.id;
   if (!userId) return;
+
+  if (isBlockedUser(env, userId, message.from?.username)) {
+    return;
+  }
 
   if (isUtilityCommand(text)) {
     await handleUtilityCommand(env, message);

@@ -1,4 +1,5 @@
 import { channelTriggerKeyboard } from './channel';
+import { primaryQaChatId } from './qa-chats';
 import { clearSession } from './session';
 import { isAdminUser, normalizeCommand, pinChatMessage, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
@@ -14,8 +15,8 @@ export async function sendOpenAppPrompt(
 }
 
 export async function postChannelTriggers(env: Env): Promise<void> {
-  const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
-  if (!Number.isFinite(chatId)) {
+  const chatId = primaryQaChatId(env);
+  if (chatId === null) {
     throw new Error('TELEGRAM_QA_CHAT_ID is not set');
   }
 
@@ -51,7 +52,7 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
   }
 
   if (command === '/setup') {
-    if (!isAdminUser(env, userId)) {
+    if (!(await isAdminUser(env, userId))) {
       await sendMessage(env, chatId, 'Only the bot admin can run /setup.');
       return;
     }

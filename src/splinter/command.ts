@@ -1,4 +1,7 @@
+import { MASTER_SPLINTER_DISPLAY } from '../brand';
 import { normalizeCommand } from '../telegram';
+
+export { MASTER_SPLINTER_DISPLAY };
 
 /**
  * Admin command to speak with Master Splinter.
@@ -6,9 +9,6 @@ import { normalizeCommand } from '../telegram';
  * Both `/master-splinter` and `/master_splinter` work in chat.
  */
 export const MASTER_SPLINTER_CMD = '/master-splinter';
-
-/** How Master Splinter refers to himself in instructions (not the Telegram @username). */
-export const MASTER_SPLINTER_DISPLAY = 'Master_Splinter';
 
 /** BotFather command menu entry (underscores only). */
 export const MASTER_SPLINTER_MENU_CMD = '/master_splinter';
@@ -22,7 +22,12 @@ export function parseMasterSplinterInvocation(
 
   for (const word of trimmed.split(/\s+/)) {
     const cmd = normalizeCommand(word);
-    if (cmd === '/master-splinter' || cmd === '/master_splinter') {
+    if (
+      cmd === '/master-splinter' ||
+      cmd === '/master_splinter' ||
+      cmd === '/master_spinter' ||
+      cmd === '/agent'
+    ) {
       const idx = trimmed.indexOf(word);
       const rest = idx >= 0 ? trimmed.slice(idx + word.length).trim() : '';
       return { rest };
