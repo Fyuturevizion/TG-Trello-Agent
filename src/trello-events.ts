@@ -1,6 +1,13 @@
 import { getCardReporter } from './card-reporter';
 import { announceTrelloEvent, notifyReporterDm } from './channel';
-import { escapeHtml } from './telegram-format';
+import {
+  escapeHtml,
+  formatBoardLine,
+  formatCardUpdateMessage,
+  formatListLine,
+  formatReporterMention,
+  type CardUpdateMessage,
+} from './telegram-format';
 import type { Env } from './types';
 
 interface TrelloWebhookPayload {
@@ -14,20 +21,22 @@ interface TrelloWebhookPayload {
       board?: { id?: string; name?: string };
       boardSource?: { id?: string; name?: string };
       old?: { closed?: boolean };
-      member?: { fullName?: string; username?: string };
     };
     memberCreator?: { fullName?: string; username?: string };
   };
 }
 
-function cardLabel(payload: TrelloWebhookPayload): string {
-  const card = payload.action?.data?.card;
-  if (!card?.name) return 'A card';
-  const name = escapeHtml(card.name);
-  return card.shortUrl ? `${name}\n${escapeHtml(card.shortUrl)}` : name;
+const REVIEW_LIST_NAMES = new Set(['pwa review', 'mobile - review']);
+
+function cardTitle(payload: TrelloWebhookPayload): string {
+  return payload.action?.data?.card?.name ?? 'A card';
 }
 
-function creatorLabel(payload: TrelloWebhookPayload): string {
+function cardShortUrl(payload: TrelloWebhookPayload): string | undefined {
+  return payload.action?.data?.card?.shortUrl;
+}
+
+function updatedBy(payload: TrelloWebhookPayload): string {
   const c = payload.action?.memberCreator;
   if (c?.username) return `@${escapeHtml(c.username)}`;
   return escapeHtml(c?.fullName ?? 'Someone');
@@ -37,8 +46,10 @@ function inboxListId(env: Env): string | undefined {
   return env.TRELLO_INBOX_LIST_ID?.trim() || undefined;
 }
 
-function devBoardId(env: Env): string | undefined {
-  return env.TRELLO_DEV_BOARD_ID?.trim() || undefined;
+function reviewListIds(env: Env): Set<string> {
+  const raw = env.TRELLO_REVIEW_LIST_IDS?.trim();
+  if (!raw) return new Set();
+  return new Set(raw.split(',').map((id) => id.trim()).filter(Boolean));
 }
 
 function archiveListIds(env: Env): Set<string> {
@@ -47,24 +58,64 @@ function archiveListIds(env: Env): Set<string> {
   return new Set(raw.split(',').map((id) => id.trim()).filter(Boolean));
 }
 
-function isDevBoard(env: Env, boardId?: string, boardName?: string): boolean {
-  const devId = devBoardId(env);
-  if (devId && boardId === devId) return true;
-  if (boardName?.toLowerCase().includes('development')) return true;
-  return false;
+function isReviewList(
+  env: Env,
+  listAfter?: { id?: string; name?: string },
+): listAfter is { id?: string; name: string } {
+  if (!listAfter?.name) return false;
+  if (listAfter.id && reviewListIds(env).has(listAfter.id)) return true;
+  return REVIEW_LIST_NAMES.has(listAfter.name.trim().toLowerCase());
 }
 
-async function notifyReporter(
+async function notifyCardUpdate(
   env: Env,
   cardId: string | undefined,
-  channelLines: string[],
-  dmText?: string,
+  message: Omit<CardUpdateMessage, 'createdBy'>,
+  dmHeadline?: string,
 ): Promise<void> {
   const reporter = cardId ? await getCardReporter(env, cardId) : null;
-  await announceTrelloEvent(env, channelLines, reporter);
-  if (reporter && dmText) {
-    await notifyReporterDm(env, reporter.reporterId, dmText);
+  const createdBy = reporter ? formatReporterMention(reporter) : undefined;
+  const lines = formatCardUpdateMessage({ ...message, createdBy });
+  await announceTrelloEvent(env, lines);
+
+  if (reporter && dmHeadline) {
+    const dmLines = formatCardUpdateMessage({
+      headline: dmHeadline,
+      title: message.title,
+      boardLine: message.boardLine,
+      listLine: message.listLine,
+      shortUrl: message.shortUrl,
+      createdBy,
+    });
+    await notifyReporterDm(env, reporter.reporterId, dmLines.join('\n'));
   }
+}
+
+async function notifyReporterTestRequest(
+  env: Env,
+  cardId: string | undefined,
+  input: {
+    title: string;
+    shortUrl?: string;
+    board?: { name?: string };
+    listAfter?: { id?: string; name?: string };
+    listBefore?: { id?: string; name?: string };
+    listName: string;
+  },
+): Promise<void> {
+  const reporter = cardId ? await getCardReporter(env, cardId) : null;
+  if (!reporter) return;
+
+  const dmLines = formatCardUpdateMessage({
+    headline: 'Please test this update',
+    title: input.title,
+    subtitle: `Your report was moved to <b>${escapeHtml(input.listName)}</b>. Please test the update and report back in the QA channel if anything still looks wrong.`,
+    boardLine: formatBoardLine(env, input.board),
+    listLine: formatListLine(input.listAfter, input.listBefore),
+    shortUrl: input.shortUrl,
+    createdBy: formatReporterMention(reporter),
+  });
+  await notifyReporterDm(env, reporter.reporterId, dmLines.join('\n'));
 }
 
 export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayload): Promise<void> {
@@ -74,58 +125,23 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
   const type = action.type;
   const data = action.data;
   const cardId = data?.card?.id;
-  const card = cardLabel(payload);
-  const creator = creatorLabel(payload);
-
-  if (type === 'addMemberToCard' && data?.member) {
-    const assignee = escapeHtml(data.member.fullName ?? data.member.username ?? 'member');
-    const devBoard = isDevBoard(env, data.board?.id, data.board?.name);
-    const lines = [
-      devBoard ? '<b>Assigned on Development board</b>' : '<b>Card assigned</b>',
-      '',
-      assignee,
-      '→',
-      card,
-      '',
-      `Updated by ${creator}`,
-    ];
-    await notifyReporter(env, cardId, lines);
-    return;
-  }
+  const title = cardTitle(payload);
+  const shortUrl = cardShortUrl(payload);
+  const editor = updatedBy(payload);
 
   if (type === 'updateCard' && data?.card?.closed === true && data.old?.closed === false) {
-    await notifyReporter(
-      env,
-      cardId,
-      ['<b>Card archived</b>', '', card, '', `Archived by ${creator}`],
-      `Your triage card was archived:\n${data.card.name ?? 'Card'}\n${data.card.shortUrl ?? ''}`,
-    );
     return;
   }
 
   if (type === 'moveCardToBoard' && data?.board) {
-    const destBoard = escapeHtml(data.board.name ?? 'another board');
-    const sourceBoard = data.boardSource?.name
-      ? escapeHtml(data.boardSource.name)
-      : 'Support/Triage';
-    const fromInbox =
-      data.listBefore?.id && inboxListId(env) && data.listBefore.id === inboxListId(env);
-
-    const lines = [
-      isDevBoard(env, data.board.id, data.board.name)
-        ? '<b>Moved to Development board</b>'
-        : '<b>Moved to another board</b>',
-      '',
-      `${sourceBoard} → ${destBoard}`,
-      '',
-      card,
-      '',
-      `Moved by ${creator}`,
-    ];
-    if (fromInbox) {
-      lines.splice(2, 0, '<i>Left INBOX — card picked up for development</i>');
-    }
-    await notifyReporter(env, cardId, lines);
+    await notifyCardUpdate(env, cardId, {
+      headline: 'Moved to another board',
+      title,
+      boardLine: formatBoardLine(env, data.board, data.boardSource),
+      listLine: formatListLine(data.listAfter, data.listBefore),
+      shortUrl,
+      updatedBy: editor,
+    });
     return;
   }
 
@@ -133,30 +149,52 @@ export async function handleTrelloWebhook(env: Env, payload: TrelloWebhookPayloa
     (type === 'updateCard' || type === 'moveCardFromBoard' || type === 'moveCardToBoard') &&
     data?.listAfter
   ) {
-    const listName = escapeHtml(data.listAfter.name ?? 'another list');
-    const before = data.listBefore?.name ? escapeHtml(data.listBefore.name) : undefined;
     const doneId = env.TRELLO_DONE_LIST_ID?.trim();
     const isDone = doneId && data.listAfter.id === doneId;
+    const isArchive = data.listAfter.id && archiveListIds(env).has(data.listAfter.id);
     const leftInbox =
       data.listBefore?.id && inboxListId(env) && data.listBefore.id === inboxListId(env);
-    const isArchive = data.listAfter.id && archiveListIds(env).has(data.listAfter.id);
 
-    if (isDone || isArchive) {
-      const status = isDone ? 'completed (DONE)' : 'archived';
-      await notifyReporter(
+    if (isArchive) {
+      return;
+    }
+
+    if (isReviewList(env, data.listAfter)) {
+      await notifyReporterTestRequest(env, cardId, {
+        title,
+        shortUrl,
+        board: data.board,
+        listAfter: data.listAfter,
+        listBefore: data.listBefore,
+        listName: data.listAfter.name,
+      });
+      return;
+    }
+
+    if (isDone) {
+      await notifyCardUpdate(
         env,
         cardId,
-        [`<b>Card ${status}</b>`, '', card, '', `Updated by ${creator}`],
-        `Your triage card is ${status}:\n${data.card?.name ?? 'Card'}\n${data.card?.shortUrl ?? ''}`,
+        {
+          headline: 'Card completed (DONE)',
+          title,
+          boardLine: formatBoardLine(env, data.board),
+          listLine: formatListLine(data.listAfter, data.listBefore),
+          shortUrl,
+          updatedBy: editor,
+        },
+        'Your triage card is completed (DONE)',
       );
       return;
     }
 
-    const moveLine = before ? `Moved: ${before} → ${listName}` : `Moved to ${listName}`;
-    const lines = ['<b>List updated</b>', '', moveLine, '', card, '', `Updated by ${creator}`];
-    if (leftInbox) {
-      lines.splice(2, 0, '<i>Left INBOX</i>');
-    }
-    await notifyReporter(env, cardId, lines);
+    await notifyCardUpdate(env, cardId, {
+      headline: leftInbox ? 'Left INBOX' : 'List updated',
+      title,
+      boardLine: formatBoardLine(env, data.board),
+      listLine: formatListLine(data.listAfter, data.listBefore),
+      shortUrl,
+      updatedBy: editor,
+    });
   }
 }

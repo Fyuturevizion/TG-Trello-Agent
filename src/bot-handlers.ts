@@ -74,7 +74,7 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
         '/chatid — show this chat ID',
         '/myid — show your Telegram user ID',
         '',
-        'Admin: /agent — Cursor cloud agent to update this bot (see /agent help)',
+        'Admin: /master-splinter — maintain this bot (see /master-splinter help)',
       ].join('\n'),
       { replyMarkup: channelTriggerKeyboard(env) },
     );

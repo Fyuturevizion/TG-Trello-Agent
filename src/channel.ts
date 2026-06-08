@@ -1,9 +1,8 @@
 import { browserLabel } from './browsers';
 import type { BrowserKey } from './browsers';
-import type { CardReporter } from './card-reporter';
 import { deviceDisplayLabel } from './devices';
 import type { DeviceKey } from './devices';
-import { escapeHtml, formatReporterMention } from './telegram-format';
+import { escapeHtml, formatBoardLine, formatCardUpdateMessage, formatReporterMention } from './telegram-format';
 import { sendMessage } from './telegram';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
@@ -32,33 +31,65 @@ export async function announceNewCard(
     input.browser ? browserLabel(input.browser) : undefined,
   );
 
-  const text = [
-    `✅ New triage card — ${mention}`,
-    '',
-    `<b>${escapeHtml(REPORT_TYPE_LABELS[input.type])}</b> · ${escapeHtml(devicePart)}`,
-    escapeHtml(input.title),
-    '',
-    escapeHtml(input.shortUrl),
-  ].join('\n');
+  const text = formatCardUpdateMessage({
+    headline: 'New triage card',
+    title: input.title,
+    subtitle: `<b>${escapeHtml(REPORT_TYPE_LABELS[input.type])}</b> · ${escapeHtml(devicePart)}`,
+    boardLine: formatBoardLine(env),
+    listLine: 'List: INBOX',
+    shortUrl: input.shortUrl,
+    createdBy: mention,
+  }).join('\n');
 
   await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+}
+
+const TEST_CARD_URL = 'https://trello.com/c/8kTHpNjt';
+
+/** Admin-only sample notification for verifying HTML card links in the QA channel. */
+export async function sendTestCardUpdate(env: Env): Promise<boolean> {
+  const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
+  if (!Number.isFinite(chatId)) return false;
+
+  const text = formatCardUpdateMessage({
+    headline: 'List updated (test)',
+    title: '\'slice" changed to capital "Slice" in Gifting coming soon modal.',
+    boardLine: formatBoardLine(env, { name: 'Development' }),
+    listLine: 'List: Backlog → In Progress',
+    shortUrl: TEST_CARD_URL,
+    updatedBy: '@iainmckie',
+    createdBy: '@Connor13all',
+  }).join('\n');
+
+  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  return true;
+}
+
+/** Admin-only sample DM matching Mobile / PWA Review list notifications. */
+export async function sendTestReviewDm(env: Env, recipientId: number): Promise<boolean> {
+  const text = formatCardUpdateMessage({
+    headline: 'Please test this update',
+    title: '\'slice" changed to capital "Slice" in Gifting coming soon modal.',
+    subtitle:
+      'Your report was moved to <b>Mobile - Review</b>. Please test the update and report back in the QA channel if anything still looks wrong.',
+    boardLine: formatBoardLine(env, { name: 'Development' }),
+    listLine: 'List: In Progress → Mobile - Review',
+    shortUrl: TEST_CARD_URL,
+    createdBy: '@Connor13all',
+  }).join('\n');
+
+  await sendMessage(env, recipientId, text, { parseMode: 'HTML' });
+  return true;
 }
 
 export async function announceTrelloEvent(
   env: Env,
   lines: string[],
-  reporter?: CardReporter | null,
 ): Promise<void> {
   const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
   if (!Number.isFinite(chatId)) return;
 
-  let text = lines.join('\n');
-  if (reporter) {
-    const mention = formatReporterMention(reporter);
-    text = `${text}\n\nReporter: ${mention}`;
-  }
-
-  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  await sendMessage(env, chatId, lines.join('\n'), { parseMode: 'HTML' });
 }
 
 export async function notifyReporterDm(

@@ -46,8 +46,75 @@ const fileLabel = document.getElementById('fileLabel');
 const deviceSelect = document.getElementById('device');
 const browserSection = document.getElementById('browserSection');
 const browserSelect = document.getElementById('browser');
+const appVersionSection = document.getElementById('appVersionSection');
+const appVersionInput = document.getElementById('appVersion');
+const appVersionInfo = document.getElementById('appVersionInfo');
+const appVersionInfoTip = document.getElementById('appVersionInfoTip');
+const nativeAppConfirmedInput = document.getElementById('nativeAppConfirmed');
+const nativeAppModal = document.getElementById('nativeAppModal');
+const nativeAppConfirmCheck = document.getElementById('nativeAppConfirmCheck');
+const nativeAppModalContinue = document.getElementById('nativeAppModalContinue');
+const nativeAppModalCancel = document.getElementById('nativeAppModalCancel');
+const nativeAppModalBackdrop = document.getElementById('nativeAppModalBackdrop');
 
 const DESKTOP_DEVICES = new Set(['apple_laptop', 'pc']);
+const NATIVE_MOBILE_DEVICES = new Set(['android', 'iphone', 'native_app']);
+const NATIVE_APP_DEVICE = 'native_app';
+
+function setAppVersionInfoOpen(open) {
+  if (!appVersionInfo || !appVersionInfoTip) return;
+  appVersionInfo.setAttribute('aria-expanded', open ? 'true' : 'false');
+  appVersionInfoTip.hidden = !open;
+}
+
+function setNativeAppConfirmed(confirmed) {
+  nativeAppConfirmedInput.value = confirmed ? 'true' : '';
+}
+
+function openNativeAppModal() {
+  nativeAppConfirmCheck.checked = false;
+  nativeAppModalContinue.disabled = true;
+  setNativeAppConfirmed(false);
+  nativeAppModal.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeNativeAppModal(revertDevice) {
+  nativeAppModal.hidden = true;
+  document.body.style.overflow = '';
+  if (revertDevice) {
+    deviceSelect.value = deviceSelect.dataset.lastValue || 'iphone';
+    setNativeAppConfirmed(false);
+    syncBrowserField();
+  }
+}
+
+function confirmNativeAppModal() {
+  setNativeAppConfirmed(true);
+  deviceSelect.dataset.lastValue = NATIVE_APP_DEVICE;
+  nativeAppModal.hidden = true;
+  document.body.style.overflow = '';
+  syncBrowserField();
+}
+
+function selectedReportType() {
+  return form.querySelector('input[name="type"]:checked')?.value ?? 'bug';
+}
+
+function needsAppVersion() {
+  return selectedReportType() === 'bug' && NATIVE_MOBILE_DEVICES.has(deviceSelect.value);
+}
+
+function syncAppVersionField() {
+  const show = needsAppVersion();
+  appVersionSection.hidden = !show;
+  appVersionInput.required = show;
+  appVersionInput.setAttribute('aria-required', show ? 'true' : 'false');
+  if (!show) {
+    appVersionInput.value = '';
+    setAppVersionInfoOpen(false);
+  }
+}
 
 function syncBrowserField() {
   const needsBrowser = DESKTOP_DEVICES.has(deviceSelect.value);
@@ -56,9 +123,49 @@ function syncBrowserField() {
   if (!needsBrowser) {
     browserSelect.value = '';
   }
+
+  if (deviceSelect.value !== NATIVE_APP_DEVICE) {
+    setNativeAppConfirmed(false);
+  }
+
+  syncAppVersionField();
 }
 
-deviceSelect.addEventListener('change', syncBrowserField);
+deviceSelect.addEventListener('change', () => {
+  const next = deviceSelect.value;
+  if (next === NATIVE_APP_DEVICE) {
+    openNativeAppModal();
+    return;
+  }
+  deviceSelect.dataset.lastValue = next;
+  syncBrowserField();
+});
+
+deviceSelect.dataset.lastValue = deviceSelect.value;
+
+document.querySelectorAll('input[name="type"]').forEach((radio) => {
+  radio.addEventListener('change', syncAppVersionField);
+});
+
+if (appVersionInfo && appVersionInfoTip) {
+  appVersionInfo.addEventListener('click', () => {
+    const open = appVersionInfo.getAttribute('aria-expanded') !== 'true';
+    setAppVersionInfoOpen(open);
+  });
+}
+
+nativeAppConfirmCheck.addEventListener('change', () => {
+  nativeAppModalContinue.disabled = !nativeAppConfirmCheck.checked;
+});
+
+nativeAppModalContinue.addEventListener('click', () => {
+  if (!nativeAppConfirmCheck.checked) return;
+  confirmNativeAppModal();
+});
+
+nativeAppModalCancel.addEventListener('click', () => closeNativeAppModal(true));
+nativeAppModalBackdrop.addEventListener('click', () => closeNativeAppModal(true));
+
 syncBrowserField();
 
 ercNa.addEventListener('change', () => {
@@ -102,13 +209,26 @@ form.addEventListener('submit', async (e) => {
 
     const device = data.get('device');
     const browser = data.get('browser');
+    const reportType = data.get('type');
+
+    if (device === NATIVE_APP_DEVICE && data.get('nativeAppConfirmed') !== 'true') {
+      openNativeAppModal();
+      throw new Error('Please confirm this issue affects both native apps.');
+    }
+
     if (DESKTOP_DEVICES.has(device) && !browser) {
       throw new Error('Please select a browser for Mac or PC.');
     }
 
+    const appVersion = String(data.get('appVersion') ?? '').trim();
+    if (reportType === 'bug' && NATIVE_MOBILE_DEVICES.has(device) && !appVersion) {
+      setAppVersionInfoOpen(true);
+      throw new Error('App version number is required for native app bug reports.');
+    }
+
     const body = {
       initData: tg.initData,
-      type: data.get('type'),
+      type: reportType,
       device,
       title: data.get('title'),
       details: data.get('details'),
@@ -116,6 +236,8 @@ form.addEventListener('submit', async (e) => {
       photos,
     };
     if (browser) body.browser = browser;
+    if (appVersion) body.appVersion = appVersion;
+    if (device === NATIVE_APP_DEVICE) body.nativeAppConfirmed = true;
 
     const res = await fetch('/api/report', {
       method: 'POST',

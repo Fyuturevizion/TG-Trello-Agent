@@ -2,11 +2,13 @@ import {
   clearAgentSession,
   loadAgentConfig,
   loadAgentSession,
+  modelParamsForConfig,
   saveAgentConfig,
   saveAgentSession,
   type AgentConfig,
 } from './agent-config';
 import {
+  archiveAgent,
   cancelRun,
   createCloudAgent,
   followUpAgent,
@@ -15,12 +17,26 @@ import {
   isTerminalRunStatus,
 } from './cursor-api';
 import { buildIntruderReply, recordIntruderAttempt } from './agent-intruder';
+import { sendTestCardUpdate, sendTestReviewDm } from './channel';
 import { escapeHtml } from './telegram-format';
-import { isAdminUser, normalizeCommand, sendMessage } from './telegram';
+import { isAdminUser, isBlockedUser, normalizeCommand, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
 
 const POLL_MS = 5000;
-const MAX_POLLS = 72; // ~6 minutes
+const MAX_POLLS = 240; // ~20 minutes
+const PROGRESS_EVERY_POLLS = 24; // ~2 minutes
+
+const SPLINTER_COMMANDS = new Set(['/master-splinter', '/master_splinter', '/agent']);
+
+function isSplinterCommand(text: string): boolean {
+  const firstToken = text.split(/\s+/)[0] ?? '';
+  return SPLINTER_COMMANDS.has(normalizeCommand(firstToken));
+}
+
+function splinterCommandPrefix(text: string): string {
+  const firstToken = text.split(/\s+/)[0] ?? '';
+  return normalizeCommand(firstToken);
+}
 
 function buildPrompt(config: AgentConfig, userPrompt: string): string {
   return [config.systemInstructions, '', '---', '', 'Admin request (Telegram):', userPrompt].join(
@@ -30,21 +46,26 @@ function buildPrompt(config: AgentConfig, userPrompt: string): string {
 
 function helpText(): string {
   return [
-    '<b>WLTH Triage — Cursor agent (admin only)</b>',
+    '<b>WLTH Triage — Master_Splinter (admin only)</b>',
     '',
     '<b>Run</b>',
-    '/agent &lt;prompt&gt; — ask the agent to change this repo',
-    '/agent status — last run status',
-    '/agent cancel — cancel active run',
-    '/agent reset — forget session (start fresh next time)',
+    '/master-splinter &lt;prompt&gt; — ask me to change this repo',
+    '/master-splinter status — last run status',
+    '/master-splinter cancel — cancel active run',
+    '/master-splinter reset — forget session (fresh context next time)',
+    '/master-splinter new &lt;prompt&gt; — force a new session',
+    '/master-splinter test — post a sample card update to the QA channel',
+    '/master-splinter test-dm — send a sample review-list DM to you',
     '',
     '<b>Config</b>',
-    '/agent config — show settings',
-    '/agent config repo &lt;github url&gt;',
-    '/agent config branch &lt;ref&gt;',
-    '/agent config model &lt;model id&gt;',
-    '/agent config pr on|off',
-    '/agent config instructions &lt;text&gt;',
+    '/master-splinter config — show settings',
+    '/master-splinter config repo &lt;github url&gt;',
+    '/master-splinter config branch &lt;ref&gt;',
+    '/master-splinter config model &lt;model id&gt;',
+    '/master-splinter config pr on|off',
+    '/master-splinter config fast on|off',
+    '/master-splinter config session-limit &lt;n&gt;',
+    '/master-splinter config instructions &lt;text&gt;',
   ].join('\n');
 }
 
@@ -64,20 +85,30 @@ async function pollAndNotify(
       await sendMessage(
         env,
         chatId,
-        `Agent poll failed: ${escapeHtml(error instanceof Error ? error.message : String(error))}`,
+        `Poll failed: ${escapeHtml(error instanceof Error ? error.message : String(error))}`,
         { parseMode: 'HTML' },
       );
       return;
     }
 
-    if (!isTerminalRunStatus(run.status)) continue;
+    if (!isTerminalRunStatus(run.status)) {
+      if (i > 0 && i % PROGRESS_EVERY_POLLS === 0) {
+        await sendMessage(
+          env,
+          chatId,
+          `<b>Still working</b> (${Math.round((i * POLL_MS) / 60000)} min). Reasoning and edits can take a while on larger tasks.`,
+          { parseMode: 'HTML' },
+        );
+      }
+      continue;
+    }
 
     const link = agentUrl ? `\n${escapeHtml(agentUrl)}` : '';
     const result = run.result?.trim();
     const summary =
       run.status === 'FINISHED'
-        ? '<b>Cursor agent finished</b>'
-        : `<b>Cursor agent ${escapeHtml(run.status)}</b>`;
+        ? '<b>Finished</b>'
+        : `<b>Run ${escapeHtml(run.status)}</b>`;
 
     const text = [
       summary,
@@ -94,12 +125,77 @@ async function pollAndNotify(
     env,
     chatId,
     [
-      '<b>Cursor agent still running</b>',
-      'Check progress in the dashboard:',
+      '<b>Still running after 20 minutes</b>',
+      'I stopped watching here, but the job may still be going.',
       link ? escapeHtml(link) : '(no link)',
+      '',
+      'Try /master-splinter status, or /master-splinter reset if context feels stuck.',
     ].join('\n'),
     { parseMode: 'HTML' },
   );
+}
+
+async function archiveSessionAgent(env: Env): Promise<void> {
+  const session = await loadAgentSession(env);
+  if (!session?.agentId) return;
+  try {
+    await archiveAgent(env, session.agentId);
+  } catch {
+    // Agent may already be archived or deleted.
+  }
+}
+
+async function startRun(
+  env: Env,
+  config: AgentConfig,
+  promptText: string,
+  nameHint: string,
+  forceNew: boolean,
+): Promise<{ agentId: string; runId: string; agentUrl?: string; freshSession: boolean }> {
+  const model = { id: config.modelId, params: modelParamsForConfig(config) };
+  let session = forceNew ? null : await loadAgentSession(env);
+
+  if (
+    session?.agentId &&
+    (session.promptCount ?? 0) >= config.maxSessionPrompts
+  ) {
+    await archiveSessionAgent(env);
+    await clearAgentSession(env);
+    session = null;
+  }
+
+  if (session?.agentId) {
+    try {
+      const agent = await getAgent(env, session.agentId);
+      if (agent.status === 'ACTIVE' || agent.status === 'CREATING') {
+        const { run } = await followUpAgent(env, session.agentId, promptText, model);
+        return {
+          agentId: session.agentId,
+          runId: run.id,
+          agentUrl: agent.url ?? session.agentUrl,
+          freshSession: false,
+        };
+      }
+    } catch {
+      // Fall through to create a new agent.
+    }
+  }
+
+  const created = await createCloudAgent(env, {
+    promptText,
+    repoUrl: config.repoUrl,
+    startingRef: config.startingRef,
+    modelId: config.modelId,
+    modelParams: model.params,
+    autoCreatePR: config.autoCreatePR,
+    name: nameHint,
+  });
+  return {
+    agentId: created.agent.id,
+    runId: created.run.id,
+    agentUrl: created.agent.url,
+    freshSession: true,
+  };
 }
 
 export async function handleAgentCommand(
@@ -108,16 +204,20 @@ export async function handleAgentCommand(
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
 ): Promise<boolean> {
   const text = message.text?.trim() ?? '';
-  const firstToken = text.split(/\s+/)[0] ?? '';
-  if (normalizeCommand(firstToken) !== '/agent') return false;
+  if (!isSplinterCommand(text)) return false;
 
+  const prefix = splinterCommandPrefix(text);
   const userId = message.from?.id;
   const chatId = message.chat.id;
   if (!userId) return true;
 
-  const rest = text.slice(firstToken.length).trim();
+  const rest = text.slice(prefix.length).trim();
 
   if (!isAdminUser(env, userId)) {
+    if (isBlockedUser(env, userId, message.from?.username)) {
+      await sendMessage(env, chatId, 'You are not permitted to use this bot.');
+      return true;
+    }
     const record = await recordIntruderAttempt(env, userId);
     await sendMessage(
       env,
@@ -125,6 +225,41 @@ export async function handleAgentCommand(
       buildIntruderReply(record, message.from?.username, message.from?.first_name),
       { parseMode: 'HTML' },
     );
+    return true;
+  }
+
+  if (rest === 'test') {
+    const posted = await sendTestCardUpdate(env);
+    if (!posted) {
+      await sendMessage(env, chatId, 'Could not post test message. Check TELEGRAM_QA_CHAT_ID is set.');
+      return true;
+    }
+    await sendMessage(
+      env,
+      chatId,
+      'Test card update posted to the QA channel. Tap <b>link to the card</b> there to confirm HTML links work.',
+      { parseMode: 'HTML' },
+    );
+    return true;
+  }
+
+  if (rest === 'test-dm' || rest === 'test dm') {
+    try {
+      await sendTestReviewDm(env, userId);
+      await sendMessage(
+        env,
+        chatId,
+        'Sample review DM sent to your private chat with the bot. Open our DM thread if you do not see it yet.',
+        { parseMode: 'HTML' },
+      );
+    } catch (error) {
+      await sendMessage(
+        env,
+        chatId,
+        `Could not send test DM. Start a private chat with the bot first (tap Start), then try again.\n${escapeHtml(error instanceof Error ? error.message : String(error))}`,
+        { parseMode: 'HTML' },
+      );
+    }
     return true;
   }
 
@@ -145,9 +280,12 @@ export async function handleAgentCommand(
   if (rest === 'status') {
     const session = await loadAgentSession(env);
     if (!session) {
-      await sendMessage(env, chatId, 'No active Cursor agent session. Use /agent &lt;prompt&gt; to start.', {
-        parseMode: 'HTML',
-      });
+      await sendMessage(
+        env,
+        chatId,
+        'No active session. Use /master-splinter &lt;prompt&gt; to start.',
+        { parseMode: 'HTML' },
+      );
       return true;
     }
     try {
@@ -164,7 +302,8 @@ export async function handleAgentCommand(
         env,
         chatId,
         [
-          `<b>Agent</b> ${escapeHtml(agent.id)}`,
+          `<b>Session</b> ${escapeHtml(agent.id)}`,
+          `Prompts in session: ${session.promptCount ?? 0}`,
           `Status: ${escapeHtml(agent.status ?? 'unknown')}${runLine}`,
           agent.url ? escapeHtml(agent.url) : '',
         ].join('\n'),
@@ -182,8 +321,13 @@ export async function handleAgentCommand(
   }
 
   if (rest === 'reset') {
+    await archiveSessionAgent(env);
     await clearAgentSession(env);
-    await sendMessage(env, chatId, 'Cursor agent session cleared. Next /agent will create a new agent.');
+    await sendMessage(
+      env,
+      chatId,
+      'Session cleared. Next /master-splinter starts with a fresh context window.',
+    );
     return true;
   }
 
@@ -216,10 +360,12 @@ export async function handleAgentCommand(
         env,
         chatId,
         [
-          '<b>Agent config</b>',
+          '<b>Master_Splinter config</b>',
           `Repo: ${escapeHtml(config.repoUrl || '(not set)')}`,
           `Branch: ${escapeHtml(config.startingRef)}`,
           `Model: ${escapeHtml(config.modelId)}`,
+          `Fast mode: ${config.fastMode ? 'on' : 'off'}`,
+          `Session limit: ${config.maxSessionPrompts} prompts`,
           `Auto PR: ${config.autoCreatePR ? 'on' : 'off'}`,
           '',
           escapeHtml(config.systemInstructions.slice(0, 500)),
@@ -236,9 +382,21 @@ export async function handleAgentCommand(
     else if (key === 'branch' && value) config.startingRef = value;
     else if (key === 'model' && value) config.modelId = value;
     else if (key === 'pr' && (value === 'on' || value === 'off')) config.autoCreatePR = value === 'on';
-    else if (key === 'instructions' && value) config.systemInstructions = value;
+    else if (key === 'fast' && (value === 'on' || value === 'off')) config.fastMode = value === 'on';
+    else if (key === 'session-limit' && value) {
+      const n = Number(value);
+      if (!Number.isFinite(n) || n < 1) {
+        await sendMessage(env, chatId, 'session-limit must be a positive number.');
+        return true;
+      }
+      config.maxSessionPrompts = Math.floor(n);
+    } else if (key === 'instructions' && value) config.systemInstructions = value;
     else {
-      await sendMessage(env, chatId, 'Unknown config key. Try: repo, branch, model, pr, instructions');
+      await sendMessage(
+        env,
+        chatId,
+        'Unknown config key. Try: repo, branch, model, pr, fast, session-limit, instructions',
+      );
       return true;
     }
 
@@ -254,7 +412,7 @@ export async function handleAgentCommand(
       chatId,
       [
         'Set the GitHub repo first:',
-        '/agent config repo https://github.com/your-org/TG-Trello-Agent',
+        '/master-splinter config repo https://github.com/your-org/TG-Trello-Agent',
         '',
         'Or set CURSOR_AGENT_REPO_URL on the Worker.',
       ].join('\n'),
@@ -262,66 +420,52 @@ export async function handleAgentCommand(
     return true;
   }
 
-  const promptText = buildPrompt(config, rest);
-  const session = await loadAgentSession(env);
+  const forceNew = rest.startsWith('new ');
+  const userPrompt = forceNew ? rest.slice('new '.length).trim() : rest;
+  if (!userPrompt) {
+    await sendMessage(env, chatId, helpText(), { parseMode: 'HTML' });
+    return true;
+  }
+
+  const promptText = buildPrompt(config, userPrompt);
+  const priorSession = await loadAgentSession(env);
 
   try {
-    let agentId: string;
-    let runId: string;
-    let agentUrl: string | undefined;
-
-    if (session?.agentId) {
-      try {
-        const agent = await getAgent(env, session.agentId);
-        if (agent.status === 'ACTIVE' || agent.status === 'CREATING') {
-          const { run } = await followUpAgent(env, session.agentId, promptText, config.modelId);
-          agentId = session.agentId;
-          runId = run.id;
-          agentUrl = agent.url ?? session.agentUrl;
-        } else {
-          throw new Error('agent_not_active');
-        }
-      } catch {
-        const created = await createCloudAgent(env, {
-          promptText,
-          repoUrl: config.repoUrl,
-          startingRef: config.startingRef,
-          modelId: config.modelId,
-          autoCreatePR: config.autoCreatePR,
-          name: rest.slice(0, 80),
-        });
-        agentId = created.agent.id;
-        runId = created.run.id;
-        agentUrl = created.agent.url;
-      }
-    } else {
-      const created = await createCloudAgent(env, {
-        promptText,
-        repoUrl: config.repoUrl,
-        startingRef: config.startingRef,
-        modelId: config.modelId,
-        autoCreatePR: config.autoCreatePR,
-        name: rest.slice(0, 80),
-      });
-      agentId = created.agent.id;
-      runId = created.run.id;
-      agentUrl = created.agent.url;
+    if (forceNew) {
+      await archiveSessionAgent(env);
+      await clearAgentSession(env);
     }
+
+    const { agentId, runId, agentUrl, freshSession } = await startRun(
+      env,
+      config,
+      promptText,
+      userPrompt.slice(0, 80),
+      forceNew,
+    );
+
+    const promptCount = freshSession ? 1 : (priorSession?.promptCount ?? 0) + 1;
 
     await saveAgentSession(env, {
       agentId,
       latestRunId: runId,
       agentUrl,
       notifyChatId: chatId,
-      lastPrompt: rest.slice(0, 500),
+      lastPrompt: userPrompt.slice(0, 500),
+      promptCount,
       updatedAt: new Date().toISOString(),
     });
 
+    const freshNote = freshSession && !forceNew && priorSession ? '\n<i>Started fresh session (context limit reached).</i>' : '';
     const link = agentUrl ? `\n${agentUrl}` : '';
     await sendMessage(
       env,
       chatId,
-      [`<b>Cursor agent started</b>`, escapeHtml(rest.slice(0, 200)), link].join('\n'),
+      [
+        `<b>On it</b>${freshNote}`,
+        escapeHtml(userPrompt.slice(0, 200)),
+        link,
+      ].join('\n'),
       { parseMode: 'HTML' },
     );
 
@@ -330,7 +474,7 @@ export async function handleAgentCommand(
     await sendMessage(
       env,
       chatId,
-      `Failed to start agent: ${escapeHtml(error instanceof Error ? error.message : String(error))}`,
+      `Failed to start: ${escapeHtml(error instanceof Error ? error.message : String(error))}`,
       { parseMode: 'HTML' },
     );
   }

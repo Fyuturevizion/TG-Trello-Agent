@@ -26,7 +26,7 @@ const TIERS: Tier[] = [
       (c) =>
         `Easy there, ${c.who} — this Cursor token isn't yours. It's admin-only, no hard feelings.`,
       (c) =>
-        `Wrong button, friend. The /agent command is for the triage overlord, not the whole realm. Attempt <b>${c.count}</b>.`,
+        `Wrong button, friend. /master-splinter is for the triage overlord, not the whole realm. Attempt <b>${c.count}</b>.`,
       (c) =>
         `${c.who}, I admire the confidence. The API key? Not yours. Go file a bug the normal way — we're chill.`,
       (c) =>
@@ -39,7 +39,7 @@ const TIERS: Tier[] = [
       (c) =>
         `Back again, ${c.who}? The token still isn't yours. We're counting: <b>${c.count}</b> and climbing.`,
       (c) =>
-        `${c.ordinal} time's the charm, they said. Not for /agent, they didn't say.`,
+        `${c.ordinal} time's the charm, they said. Not for /master-splinter, they didn't say.`,
       (c) =>
         `We see you, ${c.who}. The precious \`crsr_…\` remains with its rightful owner. You get… this message.`,
       (c) =>
@@ -52,7 +52,7 @@ const TIERS: Tier[] = [
       (c) =>
         `<b>${c.count} attempts.</b> ${c.who}, at this point you're speed-running rejection. New PB?`,
       (c) =>
-        `One does not simply /agent into production. ${c.who} does, apparently. Attempt <b>${c.count}</b>.`,
+        `One does not simply /master-splinter into production. ${c.who} does, apparently. Attempt <b>${c.count}</b>.`,
       (c) =>
         `The fellowship called. They want their unauthorized slash command back. Counter: <b>${c.count}</b>.`,
       (c) =>
@@ -65,7 +65,7 @@ const TIERS: Tier[] = [
       (c) =>
         `Day ${c.daysStalking} of ${c.who} vs. the admin token. Score: Admin 1 — You <b>${c.count}</b>.`,
       (c) =>
-        `Achievement unlocked: <i>Persistent /agent spammer</i> (${c.count}x). Reward: another joke.`,
+        `Achievement unlocked: <i>Persistent /master-splinter spammer</i> (${c.count}x). Reward: another joke.`,
       (c) =>
         `${c.who} has entered the <b>Hall of Almost-Admins</b>. Requirement: not being admin. You qualify.`,
       (c) =>
@@ -93,7 +93,7 @@ const TIERS: Tier[] = [
       (c) =>
         `The bot has evolved. It now only roasts ${c.who} on principle. Attempt <b>${c.count}</b>. Still easy-going. Still no.`,
       (c) =>
-        `Scientists studied ${c.who}'s ${c.count} /agent tries. Conclusion: token remains not yours. Paper pending.`,
+        `Scientists studied ${c.who}'s ${c.count} /master-splinter tries. Conclusion: token remains not yours. Paper pending.`,
       (c) =>
         `Final form unlocked (${c.count}x): ${c.who} vs. reality. Reality: admin owns the agent. You own the counter.`,
     ],

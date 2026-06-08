@@ -30,7 +30,9 @@
     "CURSOR_AGENT_REPO_URL": "https://github.com/Fyuturevizion/TG-Trello-Agent",
     "CURSOR_AGENT_REPO_REF": "main",
     "CURSOR_AGENT_MODEL": "composer-2.5",
-    "CURSOR_AGENT_AUTO_PR": "true"
+    "CURSOR_AGENT_AUTO_PR": "true",
+    "CURSOR_AGENT_FAST": "true",
+    "CURSOR_AGENT_MAX_SESSION_PROMPTS": "8"
   },
   "triggers": {
     "crons": ["0 8 * * *"]
