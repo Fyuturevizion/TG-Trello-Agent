@@ -1,7 +1,6 @@
-import { SPLINTER_WORKING_QUOTES } from './quotes-data';
 import { createQuotePicker } from './quote-picker';
 
-// meditation / reasoning, shown while Master Splinter works (not raw model thinking)
+// Zen presence lines only — never mix in SPLINTER_WORKING_QUOTES (those read like debug notes).
 export const SPLINTER_MEDITATION_QUOTES = [
   'I still my mind before I touch the codebase.',
   'Breathe in clarity. Breathe out assumptions.',
@@ -67,10 +66,7 @@ export const SPLINTER_MEDITATION_QUOTES = [
   'I open my eyes. The path is clear.',
 ] as const;
 
-const PRESENCE_QUOTE_POOL: readonly string[] = [
-  ...SPLINTER_MEDITATION_QUOTES,
-  ...SPLINTER_WORKING_QUOTES,
-];
+const PRESENCE_QUOTE_POOL: readonly string[] = [...SPLINTER_MEDITATION_QUOTES];
 
 const pickPresenceQuote = createQuotePicker(PRESENCE_QUOTE_POOL);
 

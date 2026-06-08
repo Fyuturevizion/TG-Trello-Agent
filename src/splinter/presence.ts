@@ -119,10 +119,7 @@ export class SplinterPresence {
       this.toolClearTimer = setTimeout(() => this.clearToolLabel(), TOOL_LABEL_MAX_MS);
     }
 
-    if (patch.thinking !== undefined || patch.assistant !== undefined) {
-      this.rotateQuote();
-    }
-
+    // Never surface stream thinking/assistant text — only refresh the spinner frame.
     this.scheduleEdit();
   }
 

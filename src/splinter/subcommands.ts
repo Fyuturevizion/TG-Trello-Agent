@@ -155,6 +155,8 @@ export async function handleMasterSplinterConfig(
         `Branch: ${escapeHtml(config.startingRef)}`,
         `Model: ${escapeHtml(config.modelId)}`,
         `Auto PR: ${config.autoCreatePR ? 'on' : 'off'}`,
+        `Fast mode: ${config.fastMode ? 'on' : 'off'}`,
+        `Session limit: ${config.maxSessionPrompts} prompts`,
         '',
         escapeHtml(config.systemInstructions.slice(0, 500)),
       ].join('\n'),
@@ -170,9 +172,21 @@ export async function handleMasterSplinterConfig(
   else if (key === 'branch' && value) config.startingRef = value;
   else if (key === 'model' && value) config.modelId = value;
   else if (key === 'pr' && (value === 'on' || value === 'off')) config.autoCreatePR = value === 'on';
-  else if (key === 'instructions' && value) config.systemInstructions = value;
+  else if (key === 'fast' && (value === 'on' || value === 'off')) config.fastMode = value === 'on';
+  else if (key === 'session-limit' && value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 1) {
+      await sendMessage(env, chatId, 'session-limit must be a positive number.');
+      return;
+    }
+    config.maxSessionPrompts = Math.floor(n);
+  } else if (key === 'instructions' && value) config.systemInstructions = value;
   else {
-    await sendMessage(env, chatId, 'Unknown config key. Try: repo, branch, model, pr, instructions');
+    await sendMessage(
+      env,
+      chatId,
+      'Unknown config key. Try: repo, branch, model, pr, fast, session-limit, instructions',
+    );
     return;
   }
 

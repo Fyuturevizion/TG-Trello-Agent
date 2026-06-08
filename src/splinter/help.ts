@@ -23,7 +23,10 @@ export function masterSplinterHelpText(): string {
     '/master-splinter config branch &lt;ref&gt;',
     '/master-splinter config model &lt;model id&gt;',
     '/master-splinter config pr on|off',
+    '/master-splinter config fast on|off',
+    '/master-splinter config session-limit &lt;n&gt;',
     '/master-splinter config instructions &lt;text&gt;',
+    '/master-splinter new &lt;message&gt;, force a fresh agent session',
     '/master-splinter test, post sample card update to QA channel',
     '/master-splinter test-dm, send sample review DM to you',
   ].join('\n');

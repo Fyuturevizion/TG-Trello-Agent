@@ -1,5 +1,5 @@
 import type { AgentConfig } from './config';
-import { loadAgentSession } from './config';
+import { clearAgentSession, loadAgentSession } from './config';
 import { wrapTelegramUserMessage } from './prompts';
 import { kickSplinterPollChain } from './poll-delivery';
 import { streamPresenceWhileRunning } from './presence-stream';
@@ -14,6 +14,7 @@ import {
 import { extractAdminSplinterPrompt, isAdminSplinterPing } from './admin-chat';
 import { savePendingSplinterRun } from './pending-run';
 import { persistRunSession, startMasterSplinterRun } from './run';
+import { archiveAgent } from '../cursor-api';
 import { SplinterPresence } from './presence';
 import {
   ensureRepoConfigured,
@@ -121,18 +122,47 @@ async function runMasterSplinterPrompt(
     return;
   }
 
+  const forceNew = rest.startsWith('new ');
+  const userPrompt = forceNew ? rest.slice('new '.length).trim() : rest;
+  if (!userPrompt) {
+    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML' });
+    return;
+  }
+
   const config = await ensureRepoConfigured(env, chatId);
   if (!config) return;
 
-  const session = await loadAgentSession(env);
-  const promptText = buildPrompt(config, rest, Boolean(session?.agentId));
+  const priorSession = await loadAgentSession(env);
+  const session = forceNew ? null : priorSession;
+  const promptText = buildPrompt(config, userPrompt, Boolean(session?.agentId));
 
   const presence = new SplinterPresence(env, chatId);
   await presence.start();
 
   try {
-    const started = await startMasterSplinterRun(env, config, promptText, rest.slice(0, 80));
-    await persistRunSession(env, chatId, started, rest);
+    if (forceNew && priorSession?.agentId) {
+      try {
+        await archiveAgent(env, priorSession.agentId);
+      } catch {
+        // ignore
+      }
+      await clearAgentSession(env);
+    }
+
+    const started = await startMasterSplinterRun(
+      env,
+      config,
+      promptText,
+      userPrompt.slice(0, 80),
+      forceNew,
+    );
+    await persistRunSession(
+      env,
+      chatId,
+      started,
+      userPrompt,
+      priorSession?.promptCount,
+    );
     await savePendingSplinterRun(env, {
       agentId: started.agentId,
       runId: started.runId,
