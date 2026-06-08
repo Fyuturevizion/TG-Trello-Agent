@@ -8,6 +8,7 @@ export const REPORTER_COMMANDS = [
   '/report',
   '/bug',
   '/wishlist',
+  '/product',
   '/help',
   '/start',
   '/cancel',

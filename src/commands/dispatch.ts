@@ -76,7 +76,7 @@ export async function dispatchTelegramMessage(
           'This chat is not registered as a WLTH QA channel.',
           `Chat ID: <code>${message.chat.id}</code>`,
           'Ask the admin to add it to <code>TELEGRAM_QA_CHAT_ID</code> (comma-separated for multiple channels).',
-          `In groups with privacy mode, use <code>/report@${bot}</code> or <code>/master_splinter@${bot}</code>.`,
+          `In groups with privacy mode, use <code>/report@${bot}</code>, <code>/product@${bot}</code>, or <code>/master_splinter@${bot}</code>.`,
         ].join('\n'),
         { parseMode: 'HTML' },
       );

@@ -1,4 +1,4 @@
-export type ReportType = 'bug' | 'wishlist';
+export type ReportType = 'bug' | 'wishlist' | 'product';
 
 export interface Env {
   ASSETS: Fetcher;
@@ -28,6 +28,12 @@ export interface Env {
   TRELLO_BOARD_NAME?: string;
   TRELLO_LABEL_BUG?: string;
   TRELLO_LABEL_IDEA?: string;
+  TRELLO_LABEL_PRODUCT?: string;
+  /** Product feedback queue (all phases) when phase lists are unset. */
+  TRELLO_PRODUCT_LIST_ID?: string;
+  TRELLO_PRODUCT_PHASE1_LIST_ID?: string;
+  TRELLO_PRODUCT_PHASE2_LIST_ID?: string;
+  TRELLO_PRODUCT_PHASE3_LIST_ID?: string;
   TRELLO_LABEL_IOS?: string;
   TRELLO_LABEL_ANDROID?: string;
   TRELLO_LABEL_WEB?: string;
@@ -116,4 +122,5 @@ export interface TelegramUpdate {
 export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   bug: 'Bug',
   wishlist: 'Wishlist',
+  product: 'Product feedback',
 };

@@ -1,6 +1,14 @@
 const tg = window.Telegram?.WebApp;
 const fallbackEl = document.getElementById('fallback');
 const appMain = document.getElementById('appMain');
+const heroDefault = document.getElementById('heroDefault');
+const heroProduct = document.getElementById('heroProduct');
+const productEyebrow = document.getElementById('productEyebrow');
+const productTitle = document.getElementById('productTitle');
+const productGoal = document.getElementById('productGoal');
+const typeSection = document.getElementById('typeSection');
+const featureAreaSection = document.getElementById('featureAreaSection');
+const featureAreaSelect = document.getElementById('featureArea');
 
 /** WLTH-branded chrome inside Telegram (header / background). */
 function applyWlthTheme() {
@@ -22,6 +30,21 @@ if (!tg?.initData) {
   applyWlthTheme();
 }
 
+const productContext = {
+  mode: false,
+  slug: '',
+  label: '',
+  phase: 1,
+};
+
+function parseProductSlug(raw) {
+  if (!raw) return null;
+  const value = String(raw).trim().toLowerCase();
+  if (value.startsWith('product_')) return value.slice('product_'.length);
+  if (value === 'product') return null;
+  return null;
+}
+
 function applyPresetType(value) {
   const type = value === 'idea' ? 'wishlist' : value;
   if (type === 'bug' || type === 'wishlist') {
@@ -34,7 +57,9 @@ const params = new URLSearchParams(location.search);
 applyPresetType(params.get('type'));
 
 const startParam = tg?.initDataUnsafe?.start_param;
-if (startParam) applyPresetType(startParam);
+if (startParam && !startParam.startsWith('product_')) {
+  applyPresetType(startParam);
+}
 
 const form = document.getElementById('form');
 const errorEl = document.getElementById('error');
@@ -98,11 +123,13 @@ function confirmNativeAppModal() {
 }
 
 function selectedReportType() {
+  if (productContext.mode) return 'product';
   return form.querySelector('input[name="type"]:checked')?.value ?? 'bug';
 }
 
 function needsAppVersion() {
-  return selectedReportType() === 'bug' && NATIVE_MOBILE_DEVICES.has(deviceSelect.value);
+  const reportType = selectedReportType();
+  return (reportType === 'bug' || reportType === 'product') && NATIVE_MOBILE_DEVICES.has(deviceSelect.value);
 }
 
 function syncAppVersionField() {
@@ -129,6 +156,54 @@ function syncBrowserField() {
   }
 
   syncAppVersionField();
+}
+
+function applyProductMode(ctx) {
+  productContext.mode = true;
+  productContext.slug = ctx.slug;
+  productContext.label = ctx.label;
+  productContext.phase = ctx.phase;
+
+  heroDefault.hidden = true;
+  heroProduct.hidden = false;
+  typeSection.hidden = true;
+  featureAreaSection.hidden = false;
+  featureAreaSelect.required = true;
+
+  productEyebrow.textContent = `${ctx.label} · Phase ${ctx.phase}`;
+  productTitle.textContent = 'Product feedback';
+  productGoal.textContent = ctx.phaseGoal || ctx.phaseTitle || 'Tell us what you found on this build.';
+  submitBtn.textContent = 'Save product feedback';
+
+  featureAreaSelect.innerHTML = '<option value="">Select area…</option>';
+  for (const area of ctx.featureAreas ?? []) {
+    const opt = document.createElement('option');
+    opt.value = area.id;
+    opt.textContent = area.label;
+    featureAreaSelect.appendChild(opt);
+  }
+
+  syncAppVersionField();
+}
+
+async function initProductMode() {
+  const fromStart = parseProductSlug(startParam);
+  const fromQuery = params.get('product');
+  const slug = fromStart || fromQuery;
+  if (!slug && startParam !== 'product') return;
+
+  try {
+    const url = slug ? `/api/product/active?slug=${encodeURIComponent(slug)}` : '/api/product/active';
+    const res = await fetch(url);
+    const json = await res.json();
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error ?? 'Product QA is not open');
+    }
+    applyProductMode(json);
+  } catch (err) {
+    errorEl.textContent = err.message ?? String(err);
+    errorEl.hidden = false;
+  }
 }
 
 deviceSelect.addEventListener('change', () => {
@@ -167,6 +242,7 @@ nativeAppModalCancel.addEventListener('click', () => closeNativeAppModal(true));
 nativeAppModalBackdrop.addEventListener('click', () => closeNativeAppModal(true));
 
 syncBrowserField();
+void initProductMode();
 
 ercNa.addEventListener('change', () => {
   ercInput.disabled = ercNa.checked;
@@ -209,7 +285,7 @@ form.addEventListener('submit', async (e) => {
 
     const device = data.get('device');
     const browser = data.get('browser');
-    const reportType = data.get('type');
+    const reportType = selectedReportType();
 
     if (device === NATIVE_APP_DEVICE && data.get('nativeAppConfirmed') !== 'true') {
       openNativeAppModal();
@@ -221,9 +297,14 @@ form.addEventListener('submit', async (e) => {
     }
 
     const appVersion = String(data.get('appVersion') ?? '').trim();
-    if (reportType === 'bug' && NATIVE_MOBILE_DEVICES.has(device) && !appVersion) {
+    if (needsAppVersion() && !appVersion) {
       setAppVersionInfoOpen(true);
-      throw new Error('App version number is required for native app bug reports.');
+      throw new Error('App version number is required for native app reports.');
+    }
+
+    const featureArea = data.get('featureArea');
+    if (reportType === 'product' && !featureArea) {
+      throw new Error('Please select which feature area your feedback is about.');
     }
 
     const body = {
@@ -238,6 +319,11 @@ form.addEventListener('submit', async (e) => {
     if (browser) body.browser = browser;
     if (appVersion) body.appVersion = appVersion;
     if (device === NATIVE_APP_DEVICE) body.nativeAppConfirmed = true;
+    if (reportType === 'product') {
+      body.productSlug = productContext.slug;
+      body.productPhase = productContext.phase;
+      body.featureArea = featureArea;
+    }
 
     const res = await fetch('/api/report', {
       method: 'POST',
@@ -254,7 +340,10 @@ form.addEventListener('submit', async (e) => {
       tg.HapticFeedback.notificationOccurred('success');
     }
 
-    tg.showAlert('Saved to Trello INBOX. The QA channel has been notified.', () => tg.close());
+    const successMsg = reportType === 'product'
+      ? 'Product feedback saved. The QA channel has been notified.'
+      : 'Saved to Trello INBOX. The QA channel has been notified.';
+    tg.showAlert(successMsg, () => tg.close());
   } catch (err) {
     if (tg?.HapticFeedback?.notificationOccurred) {
       tg.HapticFeedback.notificationOccurred('error');
@@ -262,6 +351,6 @@ form.addEventListener('submit', async (e) => {
     errorEl.textContent = err.message ?? String(err);
     errorEl.hidden = false;
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Save to Trello INBOX';
+    submitBtn.textContent = productContext.mode ? 'Save product feedback' : 'Save to Trello INBOX';
   }
 });

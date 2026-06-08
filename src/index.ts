@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { handleProductContext } from './api/product';
 import { handleReportSubmit } from './api/report';
 import { dispatchTelegramUpdate } from './commands/dispatch';
 import { postChannelTriggers } from './bot-handlers';
@@ -34,6 +35,15 @@ app.get('/health', (c) => {
 });
 
 app.route('/slack-sensei', createSlackSenseiApp());
+
+app.get('/api/product/active', async (c) => {
+  const slug = c.req.query('slug') ?? undefined;
+  const result = await handleProductContext(c.env, slug);
+  if (!result.ok) {
+    return c.json(result, 404);
+  }
+  return c.json(result);
+});
 
 app.post('/api/report', async (c) => {
   try {

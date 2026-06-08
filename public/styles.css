@@ -111,6 +111,14 @@ body {
   margin-bottom: 16px;
 }
 
+.hero-product .eyebrow {
+  color: var(--wlth-purple);
+}
+
+.hero-product h1 {
+  color: var(--wlth-indigo);
+}
+
 .eyebrow {
   margin: 0 0 6px;
   font-size: 0.7rem;
