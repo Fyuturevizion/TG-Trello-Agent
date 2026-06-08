@@ -3,6 +3,12 @@ import { browserLabel } from './browsers';
 import type { DeviceKey } from './devices';
 import { deviceDisplayLabel, trelloDeviceOptionId } from './devices';
 import { ensureNativeAppDeviceOptionId } from './trello-device-options';
+import type { ProductDefinition } from './products';
+import {
+  PRODUCT_FEEDBACK_TYPE_LABELS,
+  buildProductParentCardDescription,
+  featureAreaLabel,
+} from './products';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
 
@@ -189,6 +195,150 @@ export async function createCard(
   });
 
   return card;
+}
+
+export async function createProductFeedbackCard(
+  env: Env,
+  definition: ProductDefinition,
+): Promise<{ id: string; shortUrl: string; name: string }> {
+  const params = trelloParams(env);
+  params.set('idList', env.TRELLO_INBOX_LIST_ID);
+  params.set('name', `[Product Feedback] ${definition.displayName}`);
+  params.set('desc', buildProductParentCardDescription(definition));
+
+  const response = await fetch(`${TRELLO_API}/cards?${params.toString()}`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Trello createProductFeedbackCard failed (${response.status}): ${body}`);
+  }
+
+  return (await response.json()) as { id: string; shortUrl: string; name: string };
+}
+
+const PRODUCT_CHECKLIST_NAME = 'Feedback';
+
+export async function ensureProductChecklist(env: Env, cardId: string): Promise<string> {
+  const params = trelloParams(env);
+  const listRes = await fetch(`${TRELLO_API}/cards/${cardId}/checklists?${params.toString()}`);
+  if (!listRes.ok) {
+    const body = await listRes.text();
+    throw new Error(`Trello list checklists failed (${listRes.status}): ${body}`);
+  }
+
+  const checklists = (await listRes.json()) as Array<{ id: string; name: string }>;
+  const existing = checklists.find((c) => c.name === PRODUCT_CHECKLIST_NAME);
+  if (existing) return existing.id;
+
+  const createParams = trelloParams(env);
+  createParams.set('idCard', cardId);
+  createParams.set('name', PRODUCT_CHECKLIST_NAME);
+
+  const createRes = await fetch(`${TRELLO_API}/checklists?${createParams.toString()}`, {
+    method: 'POST',
+  });
+  if (!createRes.ok) {
+    const body = await createRes.text();
+    throw new Error(`Trello create checklist failed (${createRes.status}): ${body}`);
+  }
+
+  const created = (await createRes.json()) as { id: string };
+  return created.id;
+}
+
+export function buildProductChecklistItemName(input: {
+  featureLabel: string;
+  feedbackType: string;
+  title: string;
+}): string {
+  const typeLabel = PRODUCT_FEEDBACK_TYPE_LABELS[input.feedbackType] ?? input.feedbackType;
+  const shortType = typeLabel.split(' ')[0] ?? typeLabel;
+  const name = `[${input.featureLabel}][${shortType}] ${input.title}`;
+  return name.length > 160 ? `${name.slice(0, 157)}…` : name;
+}
+
+export function buildProductFeedbackComment(input: {
+  definition: ProductDefinition;
+  featureId: string;
+  feedbackType: string;
+  device: DeviceKey;
+  browser?: BrowserKey;
+  appVersion?: string;
+  title: string;
+  details: string;
+  ercAddress: string;
+  reporterUsername?: string;
+  reporterId: number;
+  submissionId: string;
+}): string {
+  const feature = featureAreaLabel(input.definition, input.featureId) ?? input.featureId;
+  const reporter = input.reporterUsername ? `@${input.reporterUsername}` : `user:${input.reporterId}`;
+  const deviceLine = deviceDisplayLabel(
+    input.device,
+    input.browser ? browserLabel(input.browser) : undefined,
+  );
+  const typeLabel = PRODUCT_FEEDBACK_TYPE_LABELS[input.feedbackType] ?? input.feedbackType;
+
+  const lines = [
+    `**Submission:** \`${input.submissionId}\``,
+    `**Reporter:** ${reporter} (${input.reporterId})`,
+    `**Feature:** ${feature}`,
+    `**Feedback:** ${typeLabel}`,
+    `**Device:** ${deviceLine}`,
+  ];
+  if (input.browser) lines.push(`**Browser:** ${browserLabel(input.browser)}`);
+  if (input.appVersion) lines.push(`**App version:** ${input.appVersion}`);
+  lines.push(
+    `**ERC:** ${input.ercAddress}`,
+    '',
+    '### Summary',
+    input.title,
+    '',
+    '### Details',
+    input.details,
+  );
+  return lines.join('\n');
+}
+
+export async function addProductFeedbackItem(
+  env: Env,
+  input: {
+    cardId: string;
+    checklistId: string;
+    checklistName: string;
+    commentText: string;
+  },
+): Promise<{ checkItemId: string }> {
+  const params = trelloParams(env);
+  params.set('name', input.checklistName);
+  params.set('pos', 'bottom');
+
+  const itemRes = await fetch(
+    `${TRELLO_API}/checklists/${input.checklistId}/checkItems?${params.toString()}`,
+    { method: 'POST' },
+  );
+  if (!itemRes.ok) {
+    const body = await itemRes.text();
+    throw new Error(`Trello add checkItem failed (${itemRes.status}): ${body}`);
+  }
+
+  const item = (await itemRes.json()) as { id: string };
+
+  const commentParams = trelloParams(env);
+  commentParams.set('text', input.commentText);
+
+  const commentRes = await fetch(
+    `${TRELLO_API}/cards/${input.cardId}/actions/comments?${commentParams.toString()}`,
+    { method: 'POST' },
+  );
+  if (!commentRes.ok) {
+    const body = await commentRes.text();
+    throw new Error(`Trello add comment failed (${commentRes.status}): ${body}`);
+  }
+
+  return { checkItemId: item.id };
 }
 
 export async function addAttachment(

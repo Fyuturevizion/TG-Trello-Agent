@@ -1,5 +1,6 @@
 import { channelTriggerKeyboard } from './channel';
 import { clearSession } from './session';
+import { handleProductCommand } from './product-handlers';
 import { isAdminUser, normalizeCommand, pinChatMessage, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
 
@@ -9,7 +10,7 @@ export async function sendOpenAppPrompt(
   intro?: string,
 ): Promise<void> {
   await sendMessage(env, chatId, intro ?? 'WLTH QA triage — open the form:', {
-    replyMarkup: channelTriggerKeyboard(env),
+    replyMarkup: await channelTriggerKeyboard(env),
   });
 }
 
@@ -27,7 +28,7 @@ export async function postChannelTriggers(env: Env): Promise<void> {
       '',
       'Tap a button to open the report form. One message is posted here when a card is submitted.',
     ].join('\n'),
-    { replyMarkup: channelTriggerKeyboard(env) },
+    { replyMarkup: await channelTriggerKeyboard(env) },
   );
 
   try {
@@ -69,15 +70,21 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
         '',
         'Use the Mini App to submit bugs — one channel post per report.',
         '',
-        '/report — open form',
+        '/report — open triage form',
+        '/product — product build feedback (see /product help)',
         '/setup — post pinned buttons in QA channel (admin)',
         '/chatid — show this chat ID',
         '/myid — show your Telegram user ID',
         '',
         'Admin: /master-splinter — maintain this bot (see /master-splinter help)',
       ].join('\n'),
-      { replyMarkup: channelTriggerKeyboard(env) },
+      { replyMarkup: await channelTriggerKeyboard(env) },
     );
+    return;
+  }
+
+  if (command === '/product' || text.startsWith('/product@') || text.startsWith('/product ')) {
+    await handleProductCommand(env, message);
     return;
   }
 

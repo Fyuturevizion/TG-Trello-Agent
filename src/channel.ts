@@ -2,6 +2,8 @@ import { browserLabel } from './browsers';
 import type { BrowserKey } from './browsers';
 import { deviceDisplayLabel } from './devices';
 import type { DeviceKey } from './devices';
+import { listActiveProducts } from './products';
+import { PRODUCT_FEEDBACK_TYPE_LABELS } from './products';
 import { escapeHtml, formatBoardLine, formatCardUpdateMessage, formatReporterMention } from './telegram-format';
 import { sendMessage } from './telegram';
 import type { Env, ReportType } from './types';
@@ -37,6 +39,38 @@ export async function announceNewCard(
     subtitle: `<b>${escapeHtml(REPORT_TYPE_LABELS[input.type])}</b> · ${escapeHtml(devicePart)}`,
     boardLine: formatBoardLine(env),
     listLine: 'List: INBOX',
+    shortUrl: input.shortUrl,
+    createdBy: mention,
+  }).join('\n');
+
+  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+}
+
+export async function announceProductFeedback(
+  env: Env,
+  input: {
+    productName: string;
+    featureLabel: string;
+    feedbackType: string;
+    title: string;
+    shortUrl: string;
+    reporterUsername?: string;
+    reporterId: number;
+    reporterFirstName?: string;
+  },
+): Promise<void> {
+  const chatId = Number(env.TELEGRAM_QA_CHAT_ID);
+  if (!Number.isFinite(chatId)) return;
+
+  const mention = formatReporterMention(input);
+  const typeLabel = PRODUCT_FEEDBACK_TYPE_LABELS[input.feedbackType] ?? input.feedbackType;
+
+  const text = formatCardUpdateMessage({
+    headline: `${input.productName} feedback`,
+    title: input.title,
+    subtitle: `<b>${escapeHtml(typeLabel)}</b> · ${escapeHtml(input.featureLabel)}`,
+    boardLine: formatBoardLine(env),
+    listLine: 'Added to product feedback card',
     shortUrl: input.shortUrl,
     createdBy: mention,
   }).join('\n');
@@ -107,23 +141,33 @@ export async function notifyReporterDm(
 export function webAppUrl(env: Env, query?: Record<string, string>): string {
   const base = (env.WEBAPP_URL ?? '').replace(/\/$/, '');
   if (!base) return '/';
-  return webappUrlWithVersion(base, query);
+  const page = query?.product ? `${base}/product.html` : base;
+  return webappUrlWithVersion(page, query);
 }
 
 const BOT_USERNAME = 'WLTH_Triage_Bot';
 
 /** Opens via BotFather main Mini App (needs Configure Mini App URL + cache bust ?ui=). */
-export function channelTriggerKeyboard(_env: Env) {
-  return channelStartAppKeyboard();
+export async function channelTriggerKeyboard(env: Env) {
+  return channelStartAppKeyboard(await listActiveProducts(env));
 }
 
-export function channelStartAppKeyboard() {
-  return {
-    inline_keyboard: [
-      [{ text: 'Report bug', url: `https://t.me/${BOT_USERNAME}?startapp=bug` }],
-      [{ text: 'Wishlist', url: `https://t.me/${BOT_USERNAME}?startapp=wishlist` }],
-    ],
-  };
+export function channelStartAppKeyboard(activeProducts: Array<{ slug: string; displayName: string }> = []) {
+  const rows: Array<Array<{ text: string; url: string }>> = [
+    [{ text: 'Report bug', url: `https://t.me/${BOT_USERNAME}?startapp=bug` }],
+    [{ text: 'Wishlist', url: `https://t.me/${BOT_USERNAME}?startapp=wishlist` }],
+  ];
+
+  for (const product of activeProducts) {
+    rows.push([
+      {
+        text: `${product.displayName} feedback`,
+        url: `https://t.me/${BOT_USERNAME}?startapp=product_${product.slug}`,
+      },
+    ]);
+  }
+
+  return { inline_keyboard: rows };
 }
 
 export function channelWebAppKeyboard(env: Env) {
