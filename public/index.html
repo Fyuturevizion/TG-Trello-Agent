@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="stylesheet" href="/styles.css?v=20260524-native-app" />
+    <link rel="stylesheet" href="/styles.css?v=20260608-product" />
   </head>
   <body>
     <div class="page">
@@ -32,14 +32,20 @@
       </header>
 
       <main class="app" id="appMain">
-        <section class="hero">
+        <section class="hero" id="heroDefault">
           <p class="eyebrow">Support/Triage → INBOX</p>
           <h1>Report an issue</h1>
           <p class="subtitle">Submit once. Your team gets one clean update in the QA channel.</p>
         </section>
 
+        <section class="hero hero-product" id="heroProduct" hidden>
+          <p class="eyebrow" id="productEyebrow">Product QA</p>
+          <h1 id="productTitle">Product feedback</h1>
+          <p class="subtitle" id="productGoal">Submit feedback on the active build.</p>
+        </section>
+
         <form id="form" class="form-stack">
-          <section class="card">
+          <section class="card" id="typeSection">
             <h2 class="field-label">Report type</h2>
             <div class="segmented" role="radiogroup" aria-label="Report type">
               <label class="segmented-item">
@@ -50,6 +56,18 @@
                 <input type="radio" name="type" value="wishlist" />
                 <span>Wishlist</span>
               </label>
+            </div>
+          </section>
+
+          <section class="card" id="featureAreaSection" hidden>
+            <h2 class="field-label">
+              Feature area
+              <span class="hint">required</span>
+            </h2>
+            <div class="select-wrap">
+              <select name="featureArea" id="featureArea" aria-label="Feature area">
+                <option value="">Select area…</option>
+              </select>
             </div>
           </section>
 
@@ -196,6 +214,6 @@
         </div>
       </div>
     </div>
-    <script src="/app.js?v=20260524-native-app" type="module"></script>
+    <script src="/app.js?v=20260608-product" type="module"></script>
   </body>
 </html>

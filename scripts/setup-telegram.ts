@@ -51,6 +51,7 @@ const PUBLIC_COMMANDS = [
   { command: 'report', description: 'Open bug or wishlist report form' },
   { command: 'bug', description: 'Shortcut: report a bug' },
   { command: 'wishlist', description: 'Shortcut: submit a wishlist item' },
+  { command: 'product', description: 'Product build feedback (when open)' },
   { command: 'help', description: 'Show available commands' },
 ];
 

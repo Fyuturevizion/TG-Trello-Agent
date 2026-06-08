@@ -1,4 +1,6 @@
-import { channelTriggerKeyboard } from './channel';
+import { channelKeyboardWithProduct, channelTriggerKeyboard } from './channel';
+import { loadActiveProductCampaign } from './product/store';
+import { handleProductCommand } from './product/handlers';
 import { primaryQaChatId } from './qa-chats';
 import { clearSession } from './session';
 import { isAdminUser, normalizeCommand, pinChatMessage, sendMessage } from './telegram';
@@ -20,15 +22,22 @@ export async function postChannelTriggers(env: Env): Promise<void> {
     throw new Error('TELEGRAM_QA_CHAT_ID is not set');
   }
 
+  const activeProduct = await loadActiveProductCampaign(env);
+  const keyboard = activeProduct
+    ? channelKeyboardWithProduct(env, activeProduct.label, activeProduct.slug)
+    : channelTriggerKeyboard(env);
+
   const sent = await sendMessage(
     env,
     chatId,
     [
       'WLTH QA Triage',
       '',
-      'Tap a button to open the report form. One message is posted here when a card is submitted.',
+      activeProduct
+        ? `Product QA open: ${activeProduct.label} (Phase ${activeProduct.phase}). Tap a button to submit feedback or a bug.`
+        : 'Tap a button to open the report form. One message is posted here when a card is submitted.',
     ].join('\n'),
-    { replyMarkup: channelTriggerKeyboard(env) },
+    { replyMarkup: keyboard },
   );
 
   try {
@@ -71,6 +80,7 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
         'Use the Mini App to submit bugs — one channel post per report.',
         '',
         '/report — open form',
+        '/product — product build feedback (when admin has opened a campaign)',
         '/setup — post pinned buttons in QA channel (admin)',
         '/chatid — show this chat ID',
         '/myid — show your Telegram user ID',
@@ -79,6 +89,8 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
     );
     return;
   }
+
+  if (await handleProductCommand(env, message)) return;
 
   if (command === '/report' || command === '/bug' || command === '/wishlist') {
     const hint =

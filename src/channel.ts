@@ -4,6 +4,8 @@ import { deviceDisplayLabel } from './devices';
 import type { DeviceKey } from './devices';
 import { escapeHtml, formatBoardLine, formatCardUpdateMessage, formatReporterMention } from './telegram-format';
 import { sendMessage } from './telegram';
+import { PRODUCT_FEATURE_AREA_LABELS } from './product/types';
+import type { ProductFeatureArea } from './product/types';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
 import { resolveBotUsername } from './bot-identity';
@@ -21,6 +23,8 @@ export async function announceNewCard(
     reporterUsername?: string;
     reporterId: number;
     reporterFirstName?: string;
+    listLine?: string;
+    featureArea?: ProductFeatureArea;
   },
 ): Promise<void> {
   const chatIds = parseQaChatIds(env);
@@ -32,12 +36,17 @@ export async function announceNewCard(
     input.browser ? browserLabel(input.browser) : undefined,
   );
 
+  const typeLabel = REPORT_TYPE_LABELS[input.type];
+  const areaLabel = input.featureArea ? PRODUCT_FEATURE_AREA_LABELS[input.featureArea] : undefined;
+  const subtitleParts = [`<b>${escapeHtml(typeLabel)}</b>`, escapeHtml(devicePart)];
+  if (areaLabel) subtitleParts.splice(1, 0, escapeHtml(areaLabel));
+
   const text = formatCardUpdateMessage({
-    headline: 'New triage card',
+    headline: input.type === 'product' ? 'New product feedback' : 'New triage card',
     title: input.title,
-    subtitle: `<b>${escapeHtml(REPORT_TYPE_LABELS[input.type])}</b> · ${escapeHtml(devicePart)}`,
+    subtitle: subtitleParts.join(' · '),
     boardLine: formatBoardLine(env),
-    listLine: 'List: INBOX',
+    listLine: input.listLine ?? 'List: INBOX',
     shortUrl: input.shortUrl,
     createdBy: mention,
   }).join('\n');
@@ -117,8 +126,18 @@ export function channelTriggerKeyboard(env: Env) {
 
 export function channelStartAppKeyboard(env: Env) {
   const bot = resolveBotUsername(env);
+  const rows: { text: string; url: string }[][] = [
+    [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
+    [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
+  ];
+  return { inline_keyboard: rows };
+}
+
+export function channelKeyboardWithProduct(env: Env, productLabel: string, productSlug: string) {
+  const bot = resolveBotUsername(env);
   return {
     inline_keyboard: [
+      [{ text: `Product: ${productLabel}`, url: `https://t.me/${bot}?startapp=product_${productSlug}` }],
       [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
       [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
     ],
