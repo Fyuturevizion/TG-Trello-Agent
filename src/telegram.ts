@@ -2,12 +2,28 @@ import type { Env } from './types';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 
+export const BOT_USERNAME = 'WLTH_Triage_Bot';
+
 /** Strips @BotUsername suffix from group commands (e.g. /report@WLTH_Triage_Bot). */
 export function normalizeCommand(text: string): string {
   const trimmed = text.trim();
   const at = trimmed.indexOf('@');
   if (at === -1) return trimmed;
   return trimmed.slice(0, at);
+}
+
+const MENTION_COMMANDS = new Set(['/help', '/start', '/report', '/bug', '/wishlist']);
+
+/** @WLTH_Triage_Bot help in a group → /help (Telegram mention, not a slash command). */
+export function commandFromBotMention(text: string): string | null {
+  const trimmed = text.trim();
+  const prefix = `@${BOT_USERNAME}`;
+  if (!trimmed.toLowerCase().startsWith(prefix.toLowerCase())) return null;
+  const tail = trimmed.slice(prefix.length).trim();
+  if (!tail) return null;
+  const word = tail.split(/\s+/)[0] ?? '';
+  const cmd = normalizeCommand(word.startsWith('/') ? word : `/${word}`);
+  return MENTION_COMMANDS.has(cmd) ? cmd : null;
 }
 
 export type InlineButton = {

@@ -1,6 +1,12 @@
 import { channelTriggerKeyboard } from './channel';
 import { clearSession } from './session';
-import { isAdminUser, normalizeCommand, pinChatMessage, sendMessage } from './telegram';
+import {
+  commandFromBotMention,
+  isAdminUser,
+  normalizeCommand,
+  pinChatMessage,
+  sendMessage,
+} from './telegram';
 import type { Env, TelegramMessage } from './types';
 
 export async function sendOpenAppPrompt(
@@ -37,9 +43,28 @@ export async function postChannelTriggers(env: Env): Promise<void> {
   }
 }
 
+function helpMessageLines(env: Env, userId: number): string[] {
+  const lines = [
+    'WLTH Triage Bot',
+    '',
+    'Submit bugs and wishlist items via the Mini App. One channel post per report.',
+    '',
+    'Tap the pinned Report bug / Wishlist buttons, or use:',
+    '/report, /bug, /wishlist — open the form',
+    '/help — this message',
+    '',
+    '/chatid — show this chat ID',
+    '/myid — show your Telegram user ID',
+  ];
+  if (isAdminUser(env, userId)) {
+    lines.push('', '/setup — refresh pinned buttons in QA channel', '/master-splinter — maintain this bot (see /master-splinter help)');
+  }
+  return lines;
+}
+
 export async function handleBotMessage(env: Env, message: TelegramMessage): Promise<void> {
   const text = message.text?.trim() ?? '';
-  const command = normalizeCommand(text);
+  const command = commandFromBotMention(text) ?? normalizeCommand(text);
   const chatId = message.chat.id;
   const userId = message.from?.id;
   if (!userId) return;
@@ -61,23 +86,9 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
   }
 
   if (command === '/start' || command === '/help') {
-    await sendMessage(
-      env,
-      chatId,
-      [
-        'WLTH Triage Bot',
-        '',
-        'Use the Mini App to submit bugs — one channel post per report.',
-        '',
-        '/report — open form',
-        '/setup — post pinned buttons in QA channel (admin)',
-        '/chatid — show this chat ID',
-        '/myid — show your Telegram user ID',
-        '',
-        'Admin: /master-splinter — maintain this bot (see /master-splinter help)',
-      ].join('\n'),
-      { replyMarkup: channelTriggerKeyboard(env) },
-    );
+    await sendMessage(env, chatId, helpMessageLines(env, userId).join('\n'), {
+      replyMarkup: channelTriggerKeyboard(env),
+    });
     return;
   }
 
