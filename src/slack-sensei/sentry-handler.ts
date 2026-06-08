@@ -8,6 +8,7 @@ import { parseSentryWebhook } from './sentry-parse';
 import { postSenseiSlackMessage } from './slack-api';
 import { createSenseiTrelloCard } from './trello-incident';
 import type { Env } from '../types';
+import { SLACK_SENSEI_DISPLAY } from './identity';
 import type { SenseiIncident } from './types';
 
 function slackThreadPermalink(channel: string, ts: string): string {
@@ -33,7 +34,7 @@ function formatSlackAlertText(issue: {
   if (issue.stackSnippet) {
     lines.push('', '```', issue.stackSnippet.slice(0, 2800), '```');
   }
-  lines.push('', '_Slack Sensei · Trello card incoming · no agent on this PR yet_');
+  lines.push('', `_${SLACK_SENSEI_DISPLAY} · tracking this incident_`);
   return lines.join('\n');
 }
 

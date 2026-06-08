@@ -25,6 +25,8 @@ export interface SenseiIncident {
   culprit?: string;
   sentryUrl?: string;
   stackSnippet?: string;
+  /** Seer root_cause_completed summary (from Seer webhook). */
+  seerRootCause?: string;
 
   slackChannelId?: string;
   slackThreadTs?: string;

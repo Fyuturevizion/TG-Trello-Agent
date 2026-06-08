@@ -21,21 +21,30 @@ wrangler secret put SENTRY_WEBHOOK_SECRET      # choose a long random string
 
 Optional: `TRELLO_SENSEI_LIST_ID` (else uses `TRELLO_INBOX_LIST_ID`).
 
-## Slack app
+## Slack app — Master_Splinter
 
-1. Create app at [api.slack.com/apps](https://api.slack.com/apps).
-2. **Event Subscriptions** → Enable → Request URL:  
-   `https://<worker>/slack-sensei/events`
-3. Subscribe to bot events you need later (`app_mention` for Phase 2b).
-4. Install to workspace; invite bot to the Sentry alerts channel.
-5. Copy **Signing Secret** → `SLACK_SIGNING_SECRET`.
-6. **OAuth** → `chat:write` scope → Bot token → `SLACK_BOT_TOKEN`.
+Use the **Master_Splinter** app only (App ID `A09B18QH509`):
+
+**[api.slack.com/apps/A09B18QH509](https://api.slack.com/apps/A09B18QH509)**
+
+All Worker secrets (`SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`) must come from this app — not CW-ALERTS or another bot.
+
+1. **Event Subscriptions** → Enable → Request URL:  
+   `https://wlth-tg-trello-triage.baris-53d.workers.dev/slack-sensei/events`
+2. Subscribe to bot event **`app_mention`** (Master_Splinter replies in-thread; full Cursor agent is Phase 2b).
+3. **OAuth & Permissions** → scopes at least `chat:write` → install to workspace.
+4. Copy **Signing Secret** (Basic Information) → `SLACK_SIGNING_SECRET`.
+5. Copy **Bot User OAuth Token** (`xoxb-…`) → `SLACK_BOT_TOKEN`.
+6. In channel `C09UABP7X4L`: `/invite @Master_Splinter` (or the bot’s @ handle shown in the app).
 
 ## Sentry
 
-1. **Settings → Integrations → Webhooks** (or Internal Integration).
-2. URL: `https://<worker>/slack-sensei/sentry/<SENTRY_WEBHOOK_SECRET>`
-3. Trigger on **Issue** created (or alert rule webhook).
+1. **Settings → Integrations → Webhooks** (or Internal Integration on app **Master_Splinter**).
+2. URL: `https://wlth-tg-trello-triage.baris-53d.workers.dev/slack-sensei/sentry/<SENTRY_WEBHOOK_SECRET>`
+3. Subscribe to **Issue** (or alert) webhooks for new alerts.
+4. Subscribe to **Seer** webhooks (`root_cause_completed`) on the **same URL** so Splinter stores Seer root cause and posts it in the alert thread.
+
+If Seer only appears via Sentry’s own Slack app (not our webhook), Splinter can hint that Seer is in the thread but cannot quote it until Seer webhooks are enabled. Optional scope: `channels:history` on the bot for thread reads.
 
 ## KV incident record
 

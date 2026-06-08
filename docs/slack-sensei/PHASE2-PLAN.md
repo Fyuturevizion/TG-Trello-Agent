@@ -116,7 +116,7 @@ System prompt: incident context from Sentry (stack, release, breadcrumbs), which
 
 | Secret | Purpose |
 |--------|---------|
-| `SLACK_BOT_TOKEN` | `xoxb-…` |
+| `SLACK_BOT_TOKEN` | `xoxb-…` from **Master_Splinter** app `A09B18QH509` |
 | `SLACK_SIGNING_SECRET` | Events API verification |
 | `SLACK_SENSEI_CHANNEL_ID` | `#sentry-alerts` (or C…) |
 | `SLACK_SENSEI_APPROVER_IDS` | Comma Slack user IDs |

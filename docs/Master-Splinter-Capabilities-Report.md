@@ -127,7 +127,8 @@ There is **no** fallback list that accidentally grants admin access. Channel mem
 
 The following are **not** part of the current Telegram Master Splinter deployment:
 
-- Slack integration or Sentry-driven incidents  
+- Slack **agent** commands and approval gate (Phase 2b/2c)  
+- Sentry → Slack + Trello (Phase 2a) is deployed via **Master_Splinter** Slack app `A09B18QH509` — see `docs/slack-sensei/SETUP.md`  
 - Multi-repo fixes (PWA, backend, smart contracts, common-wealth-ui)  
 - Slack sign-off before commit/PR  
 - Matomo crashlytics ingestion  

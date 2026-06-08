@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { senseiHealthStatus } from './health';
+import { handleSeerWebhook } from './seer-handler';
 import { handleSentryWebhook } from './sentry-handler';
+import { parseSeerWebhook } from './seer-parse';
 import { handleSlackEventsRequest } from './slack-events';
 import type { Env } from '../types';
 
@@ -14,7 +16,12 @@ export function createSlackSenseiApp() {
 
   sensei.post('/events', async (c) => {
     const rawBody = await c.req.text();
-    return handleSlackEventsRequest(c.env, rawBody, c.req.raw.headers);
+    return handleSlackEventsRequest(
+      c.env,
+      rawBody,
+      c.req.raw.headers,
+      (p) => c.executionCtx.waitUntil(p),
+    );
   });
 
   sensei.post('/sentry/:secret', async (c) => {
@@ -30,8 +37,13 @@ export function createSlackSenseiApp() {
     }
 
     try {
+      const hookResource = c.req.header('sentry-hook-resource')?.toLowerCase();
+      if (hookResource === 'seer' || parseSeerWebhook(payload)) {
+        const result = await handleSeerWebhook(c.env, payload);
+        return c.json({ ok: true, kind: 'seer', ...result });
+      }
       const result = await handleSentryWebhook(c.env, payload);
-      return c.json({ ok: true, ...result });
+      return c.json({ ok: true, kind: 'sentry', ...result });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(JSON.stringify({ event: 'sentry_webhook_error', error: message }));
