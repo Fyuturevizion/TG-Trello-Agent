@@ -87,6 +87,11 @@ async function adminStartProduct(
     return;
   }
 
+  if (existing?.slug === slug) {
+    await handleProductStatus(env, chatId);
+    return;
+  }
+
   const campaign = await startProductCampaign(env, {
     slug: def.slug,
     label: def.label,
