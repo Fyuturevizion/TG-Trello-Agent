@@ -14,7 +14,7 @@ export const TRELLO_DEVICES: Record<
   pc: { label: 'PC', optionId: '69130ece9af7e2a785105ac8' },
 };
 
-export function trelloDeviceOptionId(env: Env, device: DeviceKey): string {
+export function trelloDeviceOptionId(_env: Env, device: DeviceKey): string {
   const optionId = TRELLO_DEVICES[device].optionId;
   if (!optionId) {
     throw new Error(`Trello device option is not configured for ${device}`);
