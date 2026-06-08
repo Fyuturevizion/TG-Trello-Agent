@@ -17,7 +17,7 @@ import {
   isTerminalRunStatus,
 } from './cursor-api';
 import { buildIntruderReply, recordIntruderAttempt } from './agent-intruder';
-import { sendTestCardUpdate } from './channel';
+import { sendTestCardUpdate, sendTestReviewDm } from './channel';
 import { escapeHtml } from './telegram-format';
 import { isAdminUser, isBlockedUser, normalizeCommand, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
@@ -55,6 +55,7 @@ function helpText(): string {
     '/master-splinter reset — forget session (fresh context next time)',
     '/master-splinter new &lt;prompt&gt; — force a new session',
     '/master-splinter test — post a sample card update to the QA channel',
+    '/master-splinter test-dm — send a sample review-list DM to you',
     '',
     '<b>Config</b>',
     '/master-splinter config — show settings',
@@ -239,6 +240,26 @@ export async function handleAgentCommand(
       'Test card update posted to the QA channel. Tap <b>link to the card</b> there to confirm HTML links work.',
       { parseMode: 'HTML' },
     );
+    return true;
+  }
+
+  if (rest === 'test-dm' || rest === 'test dm') {
+    try {
+      await sendTestReviewDm(env, userId);
+      await sendMessage(
+        env,
+        chatId,
+        'Sample review DM sent to your private chat with the bot. Open our DM thread if you do not see it yet.',
+        { parseMode: 'HTML' },
+      );
+    } catch (error) {
+      await sendMessage(
+        env,
+        chatId,
+        `Could not send test DM. Start a private chat with the bot first (tap Start), then try again.\n${escapeHtml(error instanceof Error ? error.message : String(error))}`,
+        { parseMode: 'HTML' },
+      );
+    }
     return true;
   }
 

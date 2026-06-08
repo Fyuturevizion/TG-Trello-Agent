@@ -65,6 +65,23 @@ export async function sendTestCardUpdate(env: Env): Promise<boolean> {
   return true;
 }
 
+/** Admin-only sample DM matching Mobile / PWA Review list notifications. */
+export async function sendTestReviewDm(env: Env, recipientId: number): Promise<boolean> {
+  const text = formatCardUpdateMessage({
+    headline: 'Please test this update',
+    title: '\'slice" changed to capital "Slice" in Gifting coming soon modal.',
+    subtitle:
+      'Your report was moved to <b>Mobile - Review</b>. Please test the update and report back in the QA channel if anything still looks wrong.',
+    boardLine: formatBoardLine(env, { name: 'Development' }),
+    listLine: 'List: In Progress → Mobile - Review',
+    shortUrl: TEST_CARD_URL,
+    createdBy: '@Connor13all',
+  }).join('\n');
+
+  await sendMessage(env, recipientId, text, { parseMode: 'HTML' });
+  return true;
+}
+
 export async function announceTrelloEvent(
   env: Env,
   lines: string[],
