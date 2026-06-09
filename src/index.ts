@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { getActiveProductPublic, handleProductFeedbackSubmit } from './api/product-feedback';
 import { handleReportSubmit } from './api/report';
 import { dispatchTelegramUpdate } from './commands/dispatch';
 import { postChannelTriggers } from './bot-handlers';
@@ -34,6 +35,38 @@ app.get('/health', (c) => {
 });
 
 app.route('/slack-sensei', createSlackSenseiApp());
+
+app.get('/api/product-active', async (c) => {
+  const result = await getActiveProductPublic(c.env);
+  if (!result.ok) {
+    return c.json({ ok: false, error: result.error }, 404);
+  }
+  return c.json({
+    ok: true,
+    slug: result.slug,
+    displayName: result.displayName,
+    areas: result.areas,
+  });
+});
+
+app.post('/api/product-feedback', async (c) => {
+  try {
+    const body = await c.req.json();
+    const result = await handleProductFeedbackSubmit(c.env, body);
+    if (!result.ok) {
+      return c.json({ ok: false, error: result.error }, result.status as 400 | 401 | 403);
+    }
+    return c.json({ ok: true, shortUrl: result.shortUrl, itemNumber: result.itemNumber });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'api_product_feedback_error',
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    return c.json({ ok: false, error: 'Internal error' }, 500);
+  }
+});
 
 app.post('/api/report', async (c) => {
   try {

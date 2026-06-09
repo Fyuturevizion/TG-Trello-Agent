@@ -25,6 +25,8 @@ export interface Env {
   TRELLO_API_KEY: string;
   TRELLO_TOKEN: string;
   TRELLO_INBOX_LIST_ID: string;
+  /** Trello list for product feedback hub cards (defaults to INBOX). */
+  TRELLO_PRODUCT_LIST_ID?: string;
   TRELLO_BOARD_NAME?: string;
   TRELLO_LABEL_BUG?: string;
   TRELLO_LABEL_IDEA?: string;

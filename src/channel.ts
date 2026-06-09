@@ -7,7 +7,9 @@ import { sendMessage } from './telegram';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
 import { resolveBotUsername } from './bot-identity';
+import { loadActiveProduct } from './product/session';
 import { parseQaChatIds, primaryQaChatId } from './qa-chats';
+import { webappUrlWithVersion } from './webapp-version';
 
 export async function announceNewCard(
   env: Env,
@@ -111,17 +113,23 @@ export async function notifyReporterDm(
 }
 
 /** Opens via BotFather main Mini App (needs Configure Mini App URL + cache bust ?ui=). */
-export function channelTriggerKeyboard(env: Env) {
+export async function channelTriggerKeyboard(env: Env) {
   return channelStartAppKeyboard(env);
 }
 
-export function channelStartAppKeyboard(env: Env) {
+export async function channelStartAppKeyboard(env: Env) {
   const bot = resolveBotUsername(env);
-  return {
-    inline_keyboard: [
-      [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
-      [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
-    ],
-  };
+  const rows: Array<Array<{ text: string; url?: string; web_app?: { url: string } }>> = [
+    [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
+    [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
+  ];
+
+  const active = await loadActiveProduct(env);
+  if (active) {
+    const productUrl = webappUrlWithVersion(env.WEBAPP_URL ?? '', { mode: 'product' });
+    rows.push([{ text: `${active.displayName} feedback`, web_app: { url: productUrl } }]);
+  }
+
+  return { inline_keyboard: rows };
 }
 

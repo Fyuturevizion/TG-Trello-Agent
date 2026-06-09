@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <link rel="stylesheet" href="/styles.css?v=20260524-native-app" />
+    <link rel="stylesheet" href="/styles.css?v=20260609-product-feedback" />
   </head>
   <body>
     <div class="page">
@@ -25,9 +25,9 @@
               height="36"
               decoding="async"
             />
-            <span class="brand-title">WLTH Product Agent</span>
+            <span class="brand-title" id="brandTitle">WLTH QA Report</span>
           </div>
-          <span class="top-bar-badge">Triage</span>
+          <span class="top-bar-badge" id="topBadge">Triage</span>
         </div>
       </header>
 
@@ -167,6 +167,78 @@
         </footer>
       </main>
 
+      <main class="app" id="productMain" hidden>
+        <section class="hero">
+          <p class="eyebrow" id="productEyebrow">Product feedback</p>
+          <h1 id="productHeading">Share your notes</h1>
+          <p class="subtitle" id="productSubtitle">
+            Your feedback is added to the shared product card as a checklist item — not a new Trello card.
+          </p>
+        </section>
+
+        <form id="productForm" class="form-stack">
+          <section class="card">
+            <h2 class="field-label">Feature area</h2>
+            <div class="select-wrap">
+              <select name="area" id="productArea" required aria-label="Feature area">
+                <option value="">Loading areas…</option>
+              </select>
+            </div>
+          </section>
+
+          <section class="card">
+            <label class="field-label" for="productTitle">Summary</label>
+            <input id="productTitle" name="title" required maxlength="200" placeholder="What did you notice?" />
+          </section>
+
+          <section class="card">
+            <label class="field-label" for="productDetails">Details</label>
+            <textarea
+              id="productDetails"
+              name="details"
+              required
+              maxlength="4000"
+              rows="5"
+              placeholder="Steps, expected vs actual, ideas…"
+            ></textarea>
+          </section>
+
+          <section class="card">
+            <h2 class="field-label">
+              Device
+              <span class="hint">optional</span>
+            </h2>
+            <div class="select-wrap">
+              <select name="device" id="productDevice" aria-label="Device">
+                <option value="">Not specified</option>
+                <option value="iPhone">iPhone</option>
+                <option value="Android">Android</option>
+                <option value="Desktop web">Desktop web</option>
+                <option value="Mobile web">Mobile web</option>
+              </select>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2 class="field-label">
+              Screenshots
+              <span class="hint">optional</span>
+            </h2>
+            <label class="file-trigger">
+              <span class="file-trigger-btn">Choose files</span>
+              <span class="file-trigger-name" id="productFileLabel">No files selected</span>
+              <input type="file" id="productPhotos" accept="image/*" multiple hidden />
+            </label>
+          </section>
+
+          <p id="productError" class="error" hidden role="alert"></p>
+        </form>
+
+        <footer class="submit-bar">
+          <button type="submit" id="productSubmit" form="productForm">Add to product card</button>
+        </footer>
+      </main>
+
       <div id="nativeAppModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="nativeAppModalTitle">
         <div class="modal-backdrop" id="nativeAppModalBackdrop"></div>
         <div class="modal-panel card">
@@ -196,6 +268,6 @@
         </div>
       </div>
     </div>
-    <script src="/app.js?v=20260524-native-app" type="module"></script>
+    <script src="/app.js?v=20260609-product-feedback" type="module"></script>
   </body>
 </html>

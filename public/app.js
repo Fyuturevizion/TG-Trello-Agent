@@ -1,6 +1,7 @@
 const tg = window.Telegram?.WebApp;
 const fallbackEl = document.getElementById('fallback');
 const appMain = document.getElementById('appMain');
+const productMain = document.getElementById('productMain');
 
 /** WLTH-branded chrome inside Telegram (header / background). */
 function applyWlthTheme() {
@@ -33,8 +34,18 @@ function applyPresetType(value) {
 const params = new URLSearchParams(location.search);
 applyPresetType(params.get('type'));
 
-const startParam = tg?.initDataUnsafe?.start_param;
-if (startParam) applyPresetType(startParam);
+const startParam = tg?.initDataUnsafe?.start_param ?? '';
+if (startParam && startParam !== 'product' && !startParam.startsWith('product_')) {
+  applyPresetType(startParam);
+}
+
+function isProductMode() {
+  return (
+    params.get('mode') === 'product' ||
+    startParam === 'product' ||
+    startParam.startsWith('product_')
+  );
+}
 
 const form = document.getElementById('form');
 const errorEl = document.getElementById('error');
@@ -265,3 +276,113 @@ form.addEventListener('submit', async (e) => {
     submitBtn.textContent = 'Save to Trello INBOX';
   }
 });
+
+const productForm = document.getElementById('productForm');
+const productErrorEl = document.getElementById('productError');
+const productSubmitBtn = document.getElementById('productSubmit');
+const productAreaSelect = document.getElementById('productArea');
+const productPhotosInput = document.getElementById('productPhotos');
+const productFileLabel = document.getElementById('productFileLabel');
+
+productPhotosInput?.addEventListener('change', () => {
+  const n = productPhotosInput.files?.length ?? 0;
+  productFileLabel.textContent =
+    n === 0 ? 'No files selected' : n === 1 ? '1 file selected' : `${n} files selected`;
+});
+
+async function initProductMode() {
+  const res = await fetch('/api/product-active');
+  const json = await res.json();
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error ?? 'Product feedback is not open');
+  }
+
+  appMain.hidden = true;
+  productMain.hidden = false;
+
+  const brandTitle = document.getElementById('brandTitle');
+  const topBadge = document.getElementById('topBadge');
+  const productHeading = document.getElementById('productHeading');
+  const productEyebrow = document.getElementById('productEyebrow');
+  if (brandTitle) brandTitle.textContent = `WLTH · ${json.displayName}`;
+  if (topBadge) topBadge.textContent = 'Product';
+  if (productHeading) productHeading.textContent = `${json.displayName} feedback`;
+  if (productEyebrow) productEyebrow.textContent = 'One shared Trello card';
+
+  productAreaSelect.innerHTML = '';
+  for (const area of json.areas) {
+    const opt = document.createElement('option');
+    opt.value = area.id;
+    opt.textContent = area.label;
+    productAreaSelect.appendChild(opt);
+  }
+}
+
+productForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  productErrorEl.hidden = true;
+  productSubmitBtn.disabled = true;
+  productSubmitBtn.textContent = 'Saving…';
+  if (tg?.HapticFeedback?.impactOccurred) tg.HapticFeedback.impactOccurred('light');
+
+  try {
+    if (!tg?.initData) {
+      throw new Error('Open this form from Telegram (@WLTH_Triage_Bot).');
+    }
+
+    const data = new FormData(productForm);
+    const photos = [];
+    const files = [...(productPhotosInput.files ?? [])].slice(0, 3);
+    for (const file of files) {
+      photos.push(await fileToBase64(file));
+    }
+
+    const body = {
+      initData: tg.initData,
+      area: data.get('area'),
+      title: data.get('title'),
+      details: data.get('details'),
+      photos,
+    };
+    const device = String(data.get('device') ?? '').trim();
+    if (device) body.device = device;
+
+    const res = await fetch('/api/product-feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error ?? 'Submit failed');
+    }
+
+    if (tg.HapticFeedback?.notificationOccurred) {
+      tg.HapticFeedback.notificationOccurred('success');
+    }
+
+    tg.showAlert(
+      `Added to the ${json.itemNumber ? `#${json.itemNumber} ` : ''}product card. Thanks!`,
+      () => tg.close(),
+    );
+  } catch (err) {
+    if (tg?.HapticFeedback?.notificationOccurred) {
+      tg.HapticFeedback.notificationOccurred('error');
+    }
+    productErrorEl.textContent = err.message ?? String(err);
+    productErrorEl.hidden = false;
+    productSubmitBtn.disabled = false;
+    productSubmitBtn.textContent = 'Add to product card';
+  }
+});
+
+if (tg?.initData && isProductMode()) {
+  initProductMode().catch((err) => {
+    appMain.hidden = true;
+    productMain.hidden = false;
+    productErrorEl.textContent = err.message ?? String(err);
+    productErrorEl.hidden = false;
+    productSubmitBtn.disabled = true;
+  });
+}
