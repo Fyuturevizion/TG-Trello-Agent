@@ -156,7 +156,7 @@ export async function handleProductMessage(env: Env, message: TelegramMessage): 
       displayName,
       cardId: hub.cardId,
       shortUrl: hub.shortUrl,
-      checklistId: hub.checklistId,
+      checklistIds: hub.checklistIds,
       openedAt: new Date().toISOString(),
       openedBy: userId,
       open: true,
@@ -171,7 +171,7 @@ export async function handleProductMessage(env: Env, message: TelegramMessage): 
       [
         `<b>${escapeHtml(displayName)}</b> feedback is live.`,
         '',
-        'One Trello card — every submission becomes a checklist item + comment.',
+        'One Trello card — each area has its own checklist; submissions append as items + comments.',
         `<a href="${escapeHtml(hub.shortUrl)}">${escapeHtml(hub.name)}</a>`,
         '',
         'Tell the team to use <code>/product</code> or run <code>/setup</code> to refresh channel buttons.',

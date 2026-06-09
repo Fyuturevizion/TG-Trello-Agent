@@ -1,4 +1,4 @@
-import { productAreaLabel } from './areas';
+import { PRODUCT_AREAS, productAreaLabel } from './areas';
 import type { Env } from '../types';
 
 const TRELLO_API = 'https://api.trello.com/1';
@@ -14,12 +14,31 @@ function productListId(env: Env): string {
   return env.TRELLO_PRODUCT_LIST_ID?.trim() || env.TRELLO_INBOX_LIST_ID;
 }
 
+async function createChecklist(
+  env: Env,
+  cardId: string,
+  name: string,
+): Promise<string> {
+  const checklistParams = trelloParams(env);
+  checklistParams.set('idCard', cardId);
+  checklistParams.set('name', name);
+
+  const checklistRes = await fetch(`${TRELLO_API}/checklists?${checklistParams.toString()}`, {
+    method: 'POST',
+  });
+  if (!checklistRes.ok) {
+    throw new Error(`Trello create checklist failed (${checklistRes.status}): ${await checklistRes.text()}`);
+  }
+  const checklist = (await checklistRes.json()) as { id: string };
+  return checklist.id;
+}
+
 export async function createProductHubCard(
   env: Env,
   displayName: string,
   slug: string,
   openedBy: number,
-): Promise<{ cardId: string; shortUrl: string; checklistId: string; name: string }> {
+): Promise<{ cardId: string; shortUrl: string; checklistIds: Record<string, string>; name: string }> {
   const params = trelloParams(env);
   params.set('idList', productListId(env));
   params.set('name', `[Product][${displayName}] Feedback hub`);
@@ -30,8 +49,12 @@ export async function createProductHubCard(
       `**Slug:** \`${slug}\``,
       `**Opened by:** ${openedBy}`,
       '',
-      'All reporter submissions land on this card as checklist items + comments.',
+      'Each feature area has its own checklist on this card.',
+      'Reporter submissions become checklist items + card comments (append-only).',
       'Close the round with `/product close` when feedback collection ends.',
+      '',
+      '**Areas:**',
+      ...PRODUCT_AREAS.map((a) => `- ${a.label}`),
     ].join('\n'),
   );
 
@@ -41,22 +64,15 @@ export async function createProductHubCard(
   }
   const card = (await cardRes.json()) as { id: string; shortUrl: string; name: string };
 
-  const checklistParams = trelloParams(env);
-  checklistParams.set('idCard', card.id);
-  checklistParams.set('name', 'Feedback items');
-
-  const checklistRes = await fetch(`${TRELLO_API}/checklists?${checklistParams.toString()}`, {
-    method: 'POST',
-  });
-  if (!checklistRes.ok) {
-    throw new Error(`Trello create checklist failed (${checklistRes.status}): ${await checklistRes.text()}`);
+  const checklistIds: Record<string, string> = {};
+  for (const area of PRODUCT_AREAS) {
+    checklistIds[area.id] = await createChecklist(env, card.id, area.label);
   }
-  const checklist = (await checklistRes.json()) as { id: string };
 
   return {
     cardId: card.id,
     shortUrl: card.shortUrl,
-    checklistId: checklist.id,
+    checklistIds,
     name: card.name,
   };
 }
@@ -82,7 +98,7 @@ export async function appendProductFeedback(
     ? `@${input.reporterUsername}`
     : input.reporterFirstName ?? `user:${input.reporterId}`;
   const area = productAreaLabel(input.area);
-  const checkName = `#${input.itemNumber} [${area}] ${input.title} — ${reporter}`.slice(0, 16384);
+  const checkName = `#${input.itemNumber} ${input.title} — ${reporter}`.slice(0, 16384);
 
   const itemParams = trelloParams(env);
   itemParams.set('name', checkName);

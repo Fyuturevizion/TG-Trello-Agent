@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import { isProductAreaId } from './areas';
 
 const ACTIVE_KEY = 'product:active';
 const TTL_SECONDS = 180 * 24 * 60 * 60;
@@ -8,7 +9,10 @@ export interface ProductCampaign {
   displayName: string;
   cardId: string;
   shortUrl: string;
-  checklistId: string;
+  /** One Trello checklist per product area. */
+  checklistIds: Record<string, string>;
+  /** @deprecated Legacy campaigns used a single checklist. */
+  checklistId?: string;
   openedAt: string;
   openedBy: number;
   open: boolean;
@@ -29,12 +33,25 @@ export function normalizeProductSlug(raw: string): string | null {
   return slug;
 }
 
+export function checklistIdForArea(campaign: ProductCampaign, area: string): string | null {
+  if (isProductAreaId(area) && campaign.checklistIds?.[area]) {
+    return campaign.checklistIds[area];
+  }
+  return campaign.checklistId ?? null;
+}
+
+function hasChecklists(campaign: ProductCampaign): boolean {
+  if (campaign.checklistId) return true;
+  const ids = campaign.checklistIds;
+  return Boolean(ids && Object.keys(ids).length > 0);
+}
+
 export async function loadActiveProduct(env: Env): Promise<ProductCampaign | null> {
   const raw = await env.SESSIONS.get(ACTIVE_KEY);
   if (!raw) return null;
   try {
     const campaign = JSON.parse(raw) as ProductCampaign;
-    if (!campaign.open || !campaign.cardId || !campaign.checklistId) return null;
+    if (!campaign.open || !campaign.cardId || !hasChecklists(campaign)) return null;
     return campaign;
   } catch {
     return null;

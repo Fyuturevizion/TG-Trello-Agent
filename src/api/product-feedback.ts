@@ -1,6 +1,6 @@
 import { isProductAreaId, PRODUCT_AREAS, productAreaLabel } from '../product/areas';
 import { announceProductFeedback } from '../product/announce';
-import { incrementProductFeedbackCount, loadActiveProduct } from '../product/session';
+import { checklistIdForArea, incrementProductFeedbackCount, loadActiveProduct } from '../product/session';
 import { addProductAttachment, appendProductFeedback } from '../product/trello';
 import { isBlockedUser } from '../telegram';
 import { validateInitData } from '../telegram-webapp';
@@ -53,7 +53,7 @@ export async function getActiveProductPublic(env: Env): Promise<{
   ok: true;
   slug: string;
   displayName: string;
-  areas: { id: string; label: string }[];
+  areas: { id: string; label: string; hint: string; icon: string }[];
 } | { ok: false; error: string }> {
   const active = await loadActiveProduct(env);
   if (!active) {
@@ -63,7 +63,12 @@ export async function getActiveProductPublic(env: Env): Promise<{
     ok: true,
     slug: active.slug,
     displayName: active.displayName,
-    areas: PRODUCT_AREAS.map((a) => ({ id: a.id, label: a.label })),
+    areas: PRODUCT_AREAS.map((a) => ({
+      id: a.id,
+      label: a.label,
+      hint: a.hint,
+      icon: a.icon,
+    })),
   };
 }
 
@@ -71,7 +76,7 @@ export async function handleProductFeedbackSubmit(
   env: Env,
   raw: unknown,
 ): Promise<
-  | { ok: true; shortUrl: string; itemNumber: number }
+  | { ok: true; shortUrl: string; itemNumber: number; areaLabel: string }
   | { ok: false; error: string; status: number }
 > {
   const body = parseBody(raw);
@@ -93,11 +98,16 @@ export async function handleProductFeedbackSubmit(
     return { ok: false, error: 'Product feedback is not open', status: 403 };
   }
 
+  const checklistId = checklistIdForArea(campaign, body.area);
+  if (!checklistId) {
+    return { ok: false, error: 'Unknown product area for this campaign', status: 400 };
+  }
+
   const itemNumber = await incrementProductFeedbackCount(env);
   const maxPhotos = Math.min(Number(env.MAX_PHOTOS ?? '3') || 3, 10);
   const photos = (body.photos ?? []).slice(0, maxPhotos);
 
-  await appendProductFeedback(env, campaign.cardId, campaign.checklistId, {
+  await appendProductFeedback(env, campaign.cardId, checklistId, {
     area: body.area,
     title: body.title,
     details: body.details,
@@ -139,5 +149,10 @@ export async function handleProductFeedbackSubmit(
     reporterFirstName: auth.user.first_name,
   });
 
-  return { ok: true, shortUrl: campaign.shortUrl, itemNumber };
+  return {
+    ok: true,
+    shortUrl: campaign.shortUrl,
+    itemNumber,
+    areaLabel: productAreaLabel(body.area),
+  };
 }

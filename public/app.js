@@ -277,17 +277,81 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
+const productHubScreen = document.getElementById('productHubScreen');
+const productFormScreen = document.getElementById('productFormScreen');
+const productCategoryGrid = document.getElementById('productCategoryGrid');
+const productHubError = document.getElementById('productHubError');
+const productBackBtn = document.getElementById('productBackBtn');
 const productForm = document.getElementById('productForm');
 const productErrorEl = document.getElementById('productError');
 const productSubmitBtn = document.getElementById('productSubmit');
-const productAreaSelect = document.getElementById('productArea');
+const productAreaInput = document.getElementById('productArea');
 const productPhotosInput = document.getElementById('productPhotos');
 const productFileLabel = document.getElementById('productFileLabel');
+const productAreaBadge = document.getElementById('productAreaBadge');
+const productFormHeading = document.getElementById('productFormHeading');
+const productFormSubtitle = document.getElementById('productFormSubtitle');
+
+let productState = { displayName: '', areas: [] };
+let selectedArea = null;
 
 productPhotosInput?.addEventListener('change', () => {
   const n = productPhotosInput.files?.length ?? 0;
   productFileLabel.textContent =
     n === 0 ? 'No files selected' : n === 1 ? '1 file selected' : `${n} files selected`;
+});
+
+function showProductHub() {
+  productHubScreen.hidden = false;
+  productFormScreen.hidden = true;
+  productErrorEl.hidden = true;
+}
+
+function showProductForm(area) {
+  selectedArea = area;
+  productAreaInput.value = area.id;
+  productAreaBadge.textContent = `${area.icon} ${area.label}`;
+  productFormHeading.textContent = area.label;
+  productFormSubtitle.textContent = area.hint ?? 'Add your notes for this area.';
+  productSubmitBtn.textContent = `Add to ${area.label}`;
+  productSubmitBtn.disabled = false;
+  productHubScreen.hidden = true;
+  productFormScreen.hidden = false;
+  productErrorEl.hidden = true;
+  document.getElementById('productTitle')?.focus();
+}
+
+function resetProductForm() {
+  productForm?.reset();
+  productAreaInput.value = selectedArea?.id ?? '';
+  productFileLabel.textContent = 'No files selected';
+  productSubmitBtn.disabled = false;
+  productSubmitBtn.textContent = selectedArea ? `Add to ${selectedArea.label}` : 'Add feedback';
+}
+
+function renderProductTiles(areas) {
+  productCategoryGrid.innerHTML = '';
+  for (const area of areas) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'product-category-tile';
+    btn.setAttribute('role', 'listitem');
+    btn.innerHTML = `
+      <span class="product-category-icon" aria-hidden="true">${area.icon ?? '•'}</span>
+      <span class="product-category-label">${area.label}</span>
+      <span class="product-category-hint">${area.hint ?? ''}</span>
+    `;
+    btn.addEventListener('click', () => {
+      if (tg?.HapticFeedback?.impactOccurred) tg.HapticFeedback.impactOccurred('light');
+      showProductForm(area);
+    });
+    productCategoryGrid.appendChild(btn);
+  }
+}
+
+productBackBtn?.addEventListener('click', () => {
+  resetProductForm();
+  showProductHub();
 });
 
 async function initProductMode() {
@@ -297,24 +361,31 @@ async function initProductMode() {
     throw new Error(json.error ?? 'Product feedback is not open');
   }
 
+  productState = { displayName: json.displayName, areas: json.areas };
   appMain.hidden = true;
   productMain.hidden = false;
+  showProductHub();
 
   const brandTitle = document.getElementById('brandTitle');
   const topBadge = document.getElementById('topBadge');
   const productHeading = document.getElementById('productHeading');
   const productEyebrow = document.getElementById('productEyebrow');
+  const productSubtitle = document.getElementById('productSubtitle');
   if (brandTitle) brandTitle.textContent = `WLTH · ${json.displayName}`;
   if (topBadge) topBadge.textContent = 'Product';
-  if (productHeading) productHeading.textContent = `${json.displayName} feedback`;
+  if (productHeading) productHeading.textContent = `${json.displayName}`;
   if (productEyebrow) productEyebrow.textContent = 'One shared Trello card';
+  if (productSubtitle) {
+    productSubtitle.textContent =
+      'Tap a feature area. Your note lands in that checklist — not a new card.';
+  }
 
-  productAreaSelect.innerHTML = '';
-  for (const area of json.areas) {
-    const opt = document.createElement('option');
-    opt.value = area.id;
-    opt.textContent = area.label;
-    productAreaSelect.appendChild(opt);
+  renderProductTiles(json.areas);
+
+  const deepArea = params.get('area');
+  if (deepArea) {
+    const match = json.areas.find((a) => a.id === deepArea);
+    if (match) showProductForm(match);
   }
 }
 
@@ -362,10 +433,11 @@ productForm?.addEventListener('submit', async (e) => {
       tg.HapticFeedback.notificationOccurred('success');
     }
 
-    tg.showAlert(
-      `Added to the ${json.itemNumber ? `#${json.itemNumber} ` : ''}product card. Thanks!`,
-      () => tg.close(),
-    );
+    const label = json.areaLabel ?? selectedArea?.label ?? 'product';
+    tg.showAlert(`Added to ${label} (#${json.itemNumber}).`, () => {
+      resetProductForm();
+      showProductHub();
+    });
   } catch (err) {
     if (tg?.HapticFeedback?.notificationOccurred) {
       tg.HapticFeedback.notificationOccurred('error');
@@ -373,7 +445,7 @@ productForm?.addEventListener('submit', async (e) => {
     productErrorEl.textContent = err.message ?? String(err);
     productErrorEl.hidden = false;
     productSubmitBtn.disabled = false;
-    productSubmitBtn.textContent = 'Add to product card';
+    productSubmitBtn.textContent = selectedArea ? `Add to ${selectedArea.label}` : 'Add feedback';
   }
 });
 
@@ -381,8 +453,9 @@ if (tg?.initData && isProductMode()) {
   initProductMode().catch((err) => {
     appMain.hidden = true;
     productMain.hidden = false;
-    productErrorEl.textContent = err.message ?? String(err);
-    productErrorEl.hidden = false;
-    productSubmitBtn.disabled = true;
+    productHubScreen.hidden = false;
+    productFormScreen.hidden = true;
+    productHubError.textContent = err.message ?? String(err);
+    productHubError.hidden = false;
   });
 }

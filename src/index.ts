@@ -56,7 +56,12 @@ app.post('/api/product-feedback', async (c) => {
     if (!result.ok) {
       return c.json({ ok: false, error: result.error }, result.status as 400 | 401 | 403);
     }
-    return c.json({ ok: true, shortUrl: result.shortUrl, itemNumber: result.itemNumber });
+    return c.json({
+      ok: true,
+      shortUrl: result.shortUrl,
+      itemNumber: result.itemNumber,
+      areaLabel: result.areaLabel,
+    });
   } catch (error) {
     console.error(
       JSON.stringify({
