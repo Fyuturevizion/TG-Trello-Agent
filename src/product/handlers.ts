@@ -8,7 +8,6 @@ import {
   slugToDisplayName,
 } from './session';
 import { resolveBotUsername } from '../bot-identity';
-import { webappUrlWithVersion } from '../webapp-version';
 import { escapeHtml } from '../telegram-format';
 import { isAdminUser, normalizeCommand, sendMessage } from '../telegram';
 import type { Env, TelegramMessage } from '../types';
@@ -40,7 +39,6 @@ export async function handleProductMessage(env: Env, message: TelegramMessage): 
       return true;
     }
     const bot = resolveBotUsername(env);
-    const url = webappUrlWithVersion(env.WEBAPP_URL ?? '', { mode: 'product' });
     await sendMessage(
       env,
       chatId,
@@ -52,8 +50,12 @@ export async function handleProductMessage(env: Env, message: TelegramMessage): 
         parseMode: 'HTML',
         replyMarkup: {
           inline_keyboard: [
-            [{ text: `${active.displayName} feedback`, web_app: { url } }],
-            [{ text: 'Open in chat', url: `https://t.me/${bot}?startapp=product` }],
+            [
+              {
+                text: `${active.displayName} feedback`,
+                url: `https://t.me/${bot}?startapp=product`,
+              },
+            ],
           ],
         },
       },

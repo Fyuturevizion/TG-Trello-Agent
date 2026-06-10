@@ -9,7 +9,6 @@ import { REPORT_TYPE_LABELS } from './types';
 import { resolveBotUsername } from './bot-identity';
 import { loadActiveProduct } from './product/session';
 import { parseQaChatIds, primaryQaChatId } from './qa-chats';
-import { webappUrlWithVersion } from './webapp-version';
 
 export async function announceNewCard(
   env: Env,
@@ -119,15 +118,17 @@ export async function channelTriggerKeyboard(env: Env) {
 
 export async function channelStartAppKeyboard(env: Env) {
   const bot = resolveBotUsername(env);
-  const rows: Array<Array<{ text: string; url?: string; web_app?: { url: string } }>> = [
+  const rows: Array<Array<{ text: string; url: string }>> = [
     [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
     [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
   ];
 
   const active = await loadActiveProduct(env);
   if (active) {
-    const productUrl = webappUrlWithVersion(env.WEBAPP_URL ?? '', { mode: 'product' });
-    rows.push([{ text: `${active.displayName} feedback`, web_app: { url: productUrl } }]);
+    // web_app buttons are private-chat only — QA channels need t.me startapp links.
+    rows.push([
+      { text: `${active.displayName} feedback`, url: `https://t.me/${bot}?startapp=product` },
+    ]);
   }
 
   return { inline_keyboard: rows };
