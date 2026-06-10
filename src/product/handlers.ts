@@ -200,7 +200,7 @@ export async function handleProductCommand(env: Env, message: TelegramMessage): 
   const rest = text.slice(PRODUCT_CMD.length).trim();
   const parts = rest.split(/\s+/).filter(Boolean);
   const sub = parts[0]?.toLowerCase() ?? '';
-  const isAdmin = await isAdminUser(env, userId);
+  const isAdmin = await isAdminUser(env, userId, message.from?.username);
 
   if (!rest || sub === 'help') {
     await sendMessage(env, chatId, productHelpText(listProductSlugs()), { parseMode: 'HTML' });

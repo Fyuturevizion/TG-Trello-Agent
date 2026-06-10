@@ -18,6 +18,14 @@ function parseUserIdList(raw: string | undefined): string[] {
   return raw.split(',').map((id) => id.trim()).filter(Boolean);
 }
 
+function parseUsernameList(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(',')
+    .map((name) => name.trim().replace(/^@/, '').toLowerCase())
+    .filter(Boolean);
+}
+
 /** The one keeper who may grant admin with the secret word. */
 export function isDojoKeeper(env: Env, userId: number): boolean {
   const keeper = env.TELEGRAM_DOJO_KEEPER_ID?.trim();
@@ -44,12 +52,19 @@ async function saveGrantedAdminIds(env: Env, ids: string[]): Promise<void> {
   });
 }
 
-/** Admin = dojo keeper, TELEGRAM_ADMIN_USER_IDS, or keeper-granted IDs only. */
-export async function isAdminUser(env: Env, userId: number): Promise<boolean> {
+/** Admin = keeper, TELEGRAM_ADMIN_USER_IDS / USERNAMES, or keeper-granted IDs. */
+export async function isAdminUser(
+  env: Env,
+  userId: number,
+  username?: string,
+): Promise<boolean> {
   if (isDojoKeeper(env, userId)) return true;
 
   const staticAdmins = parseUserIdList(env.TELEGRAM_ADMIN_USER_IDS);
   if (staticAdmins.includes(String(userId))) return true;
+
+  const adminNames = parseUsernameList(env.TELEGRAM_ADMIN_USERNAMES);
+  if (username && adminNames.includes(username.toLowerCase())) return true;
 
   const granted = await loadGrantedAdminIds(env);
   return granted.includes(String(userId));

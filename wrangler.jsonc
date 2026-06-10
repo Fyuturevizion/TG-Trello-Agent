@@ -36,7 +36,9 @@
     // Must match BotFather username exactly (no @). Update after Edit Username.
     "TELEGRAM_BOT_USERNAME": "WLTH_Triage_Bot",
     // Only this Telegram user may promote admins via /dojo_grant + secret word
-    "TELEGRAM_DOJO_KEEPER_ID": "453758488"
+    "TELEGRAM_DOJO_KEEPER_ID": "453758488",
+    // Dojo admins — IDs via Worker secret TELEGRAM_ADMIN_USER_IDS; usernames here as backup
+    "TELEGRAM_ADMIN_USERNAMES": "timmetavest,Connor13all"
   },
   "triggers": {
     "crons": ["* * * * *", "0 8 * * *"]
