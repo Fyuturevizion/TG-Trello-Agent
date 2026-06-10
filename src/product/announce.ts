@@ -1,4 +1,5 @@
-import { miniAppWebButton } from '../mini-app-buttons';
+import { productFeedbackButton } from '../mini-app-buttons';
+import { openAppFallbackText } from '../channel';
 import { parseQaChatIds } from '../qa-chats';
 import { escapeHtml } from '../telegram-format';
 import { sendMessage } from '../telegram';
@@ -7,9 +8,9 @@ import { phaseGoal, getProductDefinition } from './catalog';
 import type { ActiveProductCampaign } from './types';
 import type { Env } from '../types';
 
-export function productFeedbackKeyboard(env: Env, label: string, slug: string) {
+export function productFeedbackKeyboard(env: Env, label: string, slug: string, chatType?: string) {
   return {
-    inline_keyboard: [[miniAppWebButton(env, `Feedback: ${label}`, { product: slug })]],
+    inline_keyboard: [[productFeedbackButton(env, `Feedback: ${label}`, slug, chatType ?? 'supergroup')]],
   };
 }
 
@@ -23,6 +24,7 @@ export async function announceProductPhase(
   const def = getProductDefinition(campaign.slug);
   const goal = def ? phaseGoal(def, campaign.phase) : undefined;
   const listLine = productListLabel(env, campaign.phase);
+
   const lines = [
     `<b>Product QA opened</b> · ${escapeHtml(campaign.label)}`,
     `<b>Phase ${campaign.phase}</b>${goal ? ` · ${escapeHtml(goal.title)}` : ''}`,
@@ -38,11 +40,13 @@ export async function announceProductPhase(
   );
 
   const keyboard = productFeedbackKeyboard(env, campaign.label, campaign.slug);
+  const fallback = openAppFallbackText(env, 'product', campaign.slug);
 
   for (const chatId of chatIds) {
     await sendMessage(env, chatId, lines.join('\n'), {
       parseMode: 'HTML',
       replyMarkup: keyboard,
+      keyboardFallbackText: `${lines.join('\n')}\n\n${fallback}`,
     });
   }
 }

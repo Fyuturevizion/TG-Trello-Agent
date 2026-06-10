@@ -4,12 +4,23 @@ import { deviceDisplayLabel } from './devices';
 import type { DeviceKey } from './devices';
 import { escapeHtml, formatBoardLine, formatCardUpdateMessage, formatReporterMention } from './telegram-format';
 import { sendMessage } from './telegram';
+import { resolveBotUsername } from './bot-identity';
+import {
+  miniAppStartParam,
+  productFeedbackButton,
+  reportBugButton,
+  wishlistButton,
+} from './mini-app-buttons';
 import { PRODUCT_FEATURE_AREA_LABELS } from './product/types';
 import type { ProductFeatureArea } from './product/types';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
-import { miniAppWebButton } from './mini-app-buttons';
 import { parseQaChatIds, primaryQaChatId } from './qa-chats';
+
+function keyboardFallbackHint(env: Env, startapp: string): string {
+  const bot = resolveBotUsername(env);
+  return `Open the Mini App: https://t.me/${bot}?startapp=${encodeURIComponent(startapp)}`;
+}
 
 export async function announceNewCard(
   env: Env,
@@ -119,27 +130,52 @@ export async function notifyReporterDm(
   }
 }
 
-/** Opens via BotFather main Mini App (needs Configure Mini App URL + cache bust ?ui=). */
-export function channelTriggerKeyboard(env: Env) {
-  return channelStartAppKeyboard(env);
+/** QA channel / group keyboards — never web_app (Telegram rejects in groups). */
+export function channelTriggerKeyboard(env: Env, chatType?: string) {
+  return channelStartAppKeyboard(env, chatType);
 }
 
-export function channelStartAppKeyboard(env: Env) {
+export function channelStartAppKeyboard(env: Env, chatType?: string) {
+  const groupType = chatType ?? 'supergroup';
   return {
     inline_keyboard: [
-      [miniAppWebButton(env, 'Report bug', { type: 'bug' })],
-      [miniAppWebButton(env, 'Wishlist', { type: 'wishlist' })],
+      [reportBugButton(env, groupType)],
+      [wishlistButton(env, groupType)],
     ],
   };
 }
 
-export function channelKeyboardWithProduct(env: Env, productLabel: string, productSlug: string) {
+export function channelKeyboardWithProduct(
+  env: Env,
+  productLabel: string,
+  productSlug: string,
+  chatType?: string,
+) {
+  const groupType = chatType ?? 'supergroup';
   return {
     inline_keyboard: [
-      [miniAppWebButton(env, `Product: ${productLabel}`, { product: productSlug })],
-      [miniAppWebButton(env, 'Report bug', { type: 'bug' })],
-      [miniAppWebButton(env, 'Wishlist', { type: 'wishlist' })],
+      [productFeedbackButton(env, `Product: ${productLabel}`, productSlug, groupType)],
+      [reportBugButton(env, groupType)],
+      [wishlistButton(env, groupType)],
     ],
   };
 }
 
+export function openAppPromptMarkup(
+  env: Env,
+  chatType?: string,
+  productSlug?: string,
+  productLabel?: string,
+) {
+  if (productSlug && productLabel) {
+    return channelKeyboardWithProduct(env, productLabel, productSlug, chatType);
+  }
+  return channelTriggerKeyboard(env, chatType);
+}
+
+export function openAppFallbackText(env: Env, kind: 'bug' | 'wishlist' | 'product', slug?: string): string {
+  if (kind === 'product' && slug) {
+    return keyboardFallbackHint(env, miniAppStartParam('product', slug));
+  }
+  return keyboardFallbackHint(env, miniAppStartParam(kind));
+}

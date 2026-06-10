@@ -1,4 +1,9 @@
-import { channelKeyboardWithProduct, channelTriggerKeyboard } from './channel';
+import {
+  channelKeyboardWithProduct,
+  channelTriggerKeyboard,
+  openAppFallbackText,
+  openAppPromptMarkup,
+} from './channel';
 import { loadActiveProductCampaign } from './product/store';
 import { handleProductCommand } from './product/handlers';
 import { primaryQaChatId } from './qa-chats';
@@ -10,9 +15,13 @@ export async function sendOpenAppPrompt(
   env: Env,
   chatId: number,
   intro?: string,
+  chatType?: string,
+  kind: 'bug' | 'wishlist' = 'bug',
 ): Promise<void> {
-  await sendMessage(env, chatId, intro ?? 'WLTH QA triage — open the form:', {
-    replyMarkup: channelTriggerKeyboard(env),
+  const text = intro ?? 'WLTH QA triage — open the form:';
+  await sendMessage(env, chatId, text, {
+    replyMarkup: openAppPromptMarkup(env, chatType),
+    keyboardFallbackText: `${text}\n\n${openAppFallbackText(env, kind)}`,
   });
 }
 
@@ -24,8 +33,8 @@ export async function postChannelTriggers(env: Env): Promise<void> {
 
   const activeProduct = await loadActiveProductCampaign(env);
   const keyboard = activeProduct
-    ? channelKeyboardWithProduct(env, activeProduct.label, activeProduct.slug)
-    : channelTriggerKeyboard(env);
+    ? channelKeyboardWithProduct(env, activeProduct.label, activeProduct.slug, 'supergroup')
+    : channelTriggerKeyboard(env, 'supergroup');
 
   const sent = await sendMessage(
     env,
@@ -85,7 +94,10 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
         '/chatid — show this chat ID',
         '/myid — show your Telegram user ID',
       ].join('\n'),
-      { replyMarkup: channelTriggerKeyboard(env) },
+      {
+        replyMarkup: openAppPromptMarkup(env, message.chat.type),
+        keyboardFallbackText: `WLTH Triage Bot\n\n${openAppFallbackText(env, 'bug')}`,
+      },
     );
     return;
   }
@@ -93,13 +105,14 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
   if (await handleProductCommand(env, message)) return;
 
   if (command === '/report' || command === '/bug' || command === '/wishlist') {
+    const kind = command === '/wishlist' ? 'wishlist' : 'bug';
     const hint =
       command === '/bug'
         ? 'Bug report — open the form:'
         : command === '/wishlist'
           ? 'Wishlist — open the form:'
           : 'Open the triage form:';
-    await sendOpenAppPrompt(env, chatId, hint);
+    await sendOpenAppPrompt(env, chatId, hint, message.chat.type, kind);
     return;
   }
 }

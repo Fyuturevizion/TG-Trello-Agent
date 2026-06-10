@@ -37,10 +37,20 @@ const productContext = {
   phase: 1,
 };
 
+const PRODUCT_START_SHORTCUTS = {
+  marketplace: 'marketplace',
+  pmarketplace: 'marketplace',
+};
+
 function parseProductSlug(raw) {
   if (!raw) return null;
   const value = String(raw).trim().toLowerCase();
+  if (PRODUCT_START_SHORTCUTS[value]) return PRODUCT_START_SHORTCUTS[value];
   if (value.startsWith('product_')) return value.slice('product_'.length);
+  if (value.startsWith('p') && value.length > 1) {
+    const slug = value.slice(1);
+    return PRODUCT_START_SHORTCUTS[slug] ?? slug;
+  }
   if (value === 'product') return null;
   return null;
 }
@@ -57,7 +67,7 @@ const params = new URLSearchParams(location.search);
 applyPresetType(params.get('type'));
 
 const startParam = tg?.initDataUnsafe?.start_param;
-if (startParam && !startParam.startsWith('product_')) {
+if (startParam === 'bug' || startParam === 'wishlist' || startParam === 'idea') {
   applyPresetType(startParam);
 }
 

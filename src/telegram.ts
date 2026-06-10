@@ -50,14 +50,31 @@ export async function sendMessage(
   options?: {
     replyMarkup?: ReplyMarkup;
     parseMode?: 'Markdown' | 'HTML';
+    keyboardFallbackText?: string;
   },
 ): Promise<{ message_id: number }> {
-  return telegramRequest(env, 'sendMessage', {
-    chat_id: chatId,
-    text,
-    parse_mode: options?.parseMode,
-    reply_markup: options?.replyMarkup,
-  });
+  try {
+    return await telegramRequest(env, 'sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: options?.parseMode,
+      reply_markup: options?.replyMarkup,
+    });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (
+      options?.replyMarkup &&
+      msg.includes('BUTTON_TYPE_INVALID') &&
+      options.keyboardFallbackText
+    ) {
+      return telegramRequest(env, 'sendMessage', {
+        chat_id: chatId,
+        text: options.keyboardFallbackText,
+        parse_mode: options.parseMode,
+      });
+    }
+    throw error;
+  }
 }
 
 export async function editMessageText(

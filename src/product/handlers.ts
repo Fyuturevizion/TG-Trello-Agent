@@ -1,6 +1,7 @@
 import { isAdminUser, normalizeCommand, sendMessage } from '../telegram';
 import { escapeHtml } from '../telegram-format';
 import { getProductDefinition, listProductSlugs, phaseGoal } from './catalog';
+import { openAppFallbackText } from '../channel';
 import { productFeedbackKeyboard, announceProductPhase } from './announce';
 import { productListLabel } from './lists';
 import {
@@ -150,7 +151,12 @@ async function adminSetPhase(env: Env, chatId: number, phase: ProductPhase): Pro
   );
 }
 
-async function openProductFeedback(env: Env, chatId: number, slug?: string): Promise<void> {
+async function openProductFeedback(
+  env: Env,
+  chatId: number,
+  slug?: string,
+  chatType?: string,
+): Promise<void> {
   const active = await loadActiveProductCampaign(env);
   if (!active) {
     await sendMessage(
@@ -182,7 +188,8 @@ async function openProductFeedback(env: Env, chatId: number, slug?: string): Pro
     .join('\n');
 
   await sendMessage(env, chatId, intro, {
-    replyMarkup: productFeedbackKeyboard(env, active.label, active.slug),
+    replyMarkup: productFeedbackKeyboard(env, active.label, active.slug, chatType),
+    keyboardFallbackText: `${intro}\n\n${openAppFallbackText(env, 'product', active.slug)}`,
   });
 }
 
@@ -239,18 +246,18 @@ export async function handleProductCommand(env: Env, message: TelegramMessage): 
   }
 
   if (getProductDefinition(sub)) {
-    await openProductFeedback(env, chatId, sub);
+    await openProductFeedback(env, chatId, sub, message.chat.type);
     return true;
   }
 
   if (sub === 'feedback' || !sub) {
-    await openProductFeedback(env, chatId);
+    await openProductFeedback(env, chatId, undefined, message.chat.type);
     return true;
   }
 
   // Bare /product for reporters
   if (!isAdmin) {
-    await openProductFeedback(env, chatId);
+    await openProductFeedback(env, chatId, undefined, message.chat.type);
     return true;
   }
 
