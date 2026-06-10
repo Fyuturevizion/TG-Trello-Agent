@@ -8,7 +8,7 @@ import { PRODUCT_FEATURE_AREA_LABELS } from './product/types';
 import type { ProductFeatureArea } from './product/types';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
-import { resolveBotUsername } from './bot-identity';
+import { miniAppWebButton } from './mini-app-buttons';
 import { parseQaChatIds, primaryQaChatId } from './qa-chats';
 
 export async function announceNewCard(
@@ -125,21 +125,20 @@ export function channelTriggerKeyboard(env: Env) {
 }
 
 export function channelStartAppKeyboard(env: Env) {
-  const bot = resolveBotUsername(env);
-  const rows: { text: string; url: string }[][] = [
-    [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
-    [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
-  ];
-  return { inline_keyboard: rows };
+  return {
+    inline_keyboard: [
+      [miniAppWebButton(env, 'Report bug', { type: 'bug' })],
+      [miniAppWebButton(env, 'Wishlist', { type: 'wishlist' })],
+    ],
+  };
 }
 
 export function channelKeyboardWithProduct(env: Env, productLabel: string, productSlug: string) {
-  const bot = resolveBotUsername(env);
   return {
     inline_keyboard: [
-      [{ text: `Product: ${productLabel}`, url: `https://t.me/${bot}?startapp=product_${productSlug}` }],
-      [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
-      [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
+      [miniAppWebButton(env, `Product: ${productLabel}`, { product: productSlug })],
+      [miniAppWebButton(env, 'Report bug', { type: 'bug' })],
+      [miniAppWebButton(env, 'Wishlist', { type: 'wishlist' })],
     ],
   };
 }

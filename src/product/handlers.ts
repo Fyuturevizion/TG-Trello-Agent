@@ -1,7 +1,7 @@
 import { isAdminUser, normalizeCommand, sendMessage } from '../telegram';
 import { escapeHtml } from '../telegram-format';
 import { getProductDefinition, listProductSlugs, phaseGoal } from './catalog';
-import { productFeedbackUrl, announceProductPhase } from './announce';
+import { productFeedbackKeyboard, announceProductPhase } from './announce';
 import { productListLabel } from './lists';
 import {
   clearActiveProductCampaign,
@@ -182,9 +182,7 @@ async function openProductFeedback(env: Env, chatId: number, slug?: string): Pro
     .join('\n');
 
   await sendMessage(env, chatId, intro, {
-    replyMarkup: {
-      inline_keyboard: [[{ text: `Feedback: ${active.label}`, url: productFeedbackUrl(env, active.slug) }]],
-    },
+    replyMarkup: productFeedbackKeyboard(env, active.label, active.slug),
   });
 }
 
