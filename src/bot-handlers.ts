@@ -1,9 +1,12 @@
 import { channelTriggerKeyboard } from './channel';
+import { findCommandInText } from './commands/registry';
 import { handleProductMessage } from './product/handlers';
 import { primaryQaChatId } from './qa-chats';
 import { clearSession } from './session';
 import { isAdminUser, normalizeCommand, pinChatMessage, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
+
+const TRIAGE_OPEN_COMMANDS = ['/report', '/bug', '/wishlist'] as const;
 
 export async function sendOpenAppPrompt(
   env: Env,
@@ -39,32 +42,33 @@ export async function postChannelTriggers(env: Env): Promise<void> {
   }
 }
 
-export async function handleBotMessage(env: Env, message: TelegramMessage): Promise<void> {
+/** Handle triage bot commands. Returns true when the message was consumed. */
+export async function handleBotMessage(env: Env, message: TelegramMessage): Promise<boolean> {
   const text = message.text?.trim() ?? '';
-  const command = normalizeCommand(text);
+  const command = normalizeCommand(text.split(/\s+/)[0] ?? '');
   const chatId = message.chat.id;
   const userId = message.from?.id;
-  if (!userId) return;
+  if (!userId) return false;
 
   if (command === '/product' || text.toLowerCase().startsWith('/product ')) {
     await handleProductMessage(env, message);
-    return;
+    return true;
   }
 
   if (command === '/cancel') {
     await clearSession(env, chatId, userId);
     await sendMessage(env, chatId, 'Cancelled.');
-    return;
+    return true;
   }
 
   if (command === '/setup') {
     if (!(await isAdminUser(env, userId))) {
       await sendMessage(env, chatId, 'Only the bot admin can run /setup.');
-      return;
+      return true;
     }
     await postChannelTriggers(env);
     await sendMessage(env, chatId, 'Posted (and pinned if bot is admin) channel trigger buttons.');
-    return;
+    return true;
   }
 
   if (command === '/start' || command === '/help') {
@@ -84,17 +88,25 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
       ].join('\n'),
       { replyMarkup: await channelTriggerKeyboard(env) },
     );
-    return;
+    return true;
   }
 
-  if (command === '/report' || command === '/bug' || command === '/wishlist') {
+  const openCmd =
+    findCommandInText(text, TRIAGE_OPEN_COMMANDS) ??
+    (TRIAGE_OPEN_COMMANDS.includes(command as (typeof TRIAGE_OPEN_COMMANDS)[number])
+      ? command
+      : null);
+
+  if (openCmd) {
     const hint =
-      command === '/bug'
+      openCmd === '/bug'
         ? 'Bug report — open the form:'
-        : command === '/wishlist'
+        : openCmd === '/wishlist'
           ? 'Wishlist — open the form:'
           : 'Open the triage form:';
     await sendOpenAppPrompt(env, chatId, hint);
-    return;
+    return true;
   }
+
+  return false;
 }

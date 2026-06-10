@@ -84,9 +84,10 @@ export async function dispatchTelegramMessage(
     return;
   }
 
-  if (await handleUnauthorizedSplinterSummon(env, message)) return;
+  // Triage commands (/report, /bug, …) always win over intruder teases in QA chat.
+  if (await handleBotMessage(env, message)) return;
 
-  await handleBotMessage(env, message);
+  if (await handleUnauthorizedSplinterSummon(env, message)) return;
 }
 
 export async function dispatchTelegramUpdate(

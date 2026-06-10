@@ -25,6 +25,20 @@ export function commandToken(text: string): string {
   return normalizeCommand(text.trim().split(/\s+/)[0] ?? '');
 }
 
+/** Find a known command anywhere in the message (group chats often mention the bot first). */
+export function findCommandInText(text: string, commands: readonly string[]): string | null {
+  const set = new Set<string>(commands);
+  for (const word of text.trim().split(/\s+/)) {
+    const cmd = normalizeCommand(word);
+    if (set.has(cmd)) return cmd;
+  }
+  return null;
+}
+
+export function textContainsReporterCommand(text: string): boolean {
+  return findCommandInText(text, REPORTER_COMMANDS) !== null;
+}
+
 export function isUtilityCommand(text: string): boolean {
   return UTILITY_SET.has(commandToken(text));
 }

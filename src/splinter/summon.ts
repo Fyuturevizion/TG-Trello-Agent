@@ -1,6 +1,4 @@
-import { isReporterCommand, isUtilityCommand } from '../commands/registry';
-import { resolveBotUsername } from '../bot-identity';
-import { messageText } from '../telegram-message';
+import { isReporterCommand, isUtilityCommand, textContainsReporterCommand } from '../commands/registry';
 import { isMasterSplinterCommand } from './command';
 import type { Env, TelegramMessage } from '../types';
 
@@ -8,13 +6,50 @@ function sliceEntity(text: string, offset: number, length: number): string {
   return text.slice(offset, offset + length);
 }
 
-/** @WLTH_Triage_Bot or entity mention of the bot. */
+/** @master_splinter style mention — not the triage bot @WLTH_Triage_Bot handle. */
+export function mentionsSplinterDisplayHandle(text: string): boolean {
+  return /@master[\s_-]*splinter\b/i.test(text);
+}
+
+export function callsMasterSplinterByName(text: string): boolean {
+  return /\bmaster[\s_-]*splinter\b/i.test(text);
+}
+
+export type SplinterSummonKind = 'command' | 'mention' | 'name';
+
+function isAllowedNonSplinterMessage(text: string): boolean {
+  return (
+    isReporterCommand(text) ||
+    isUtilityCommand(text) ||
+    textContainsReporterCommand(text)
+  );
+}
+
+/** Non-admin tried to reach Master Splinter without using allowed reporter commands. */
+export function detectUnauthorizedSplinterSummon(
+  message: TelegramMessage,
+  _env: Env,
+): SplinterSummonKind | null {
+  const text = message.text?.trim() ?? message.caption?.trim() ?? '';
+  if (!text) return null;
+
+  if (isMasterSplinterCommand(text)) return null;
+  if (isAllowedNonSplinterMessage(text)) return null;
+
+  // Casual @WLTH_Triage_Bot banter is not a Splinter summon — only @master_splinter / by name.
+  if (mentionsSplinterDisplayHandle(text)) return 'mention';
+  if (callsMasterSplinterByName(text)) return 'name';
+
+  return null;
+}
+
+/** @deprecated Only used by tests / legacy — triage bot handle is not a Splinter summon. */
 export function messageMentionsBot(
   message: TelegramMessage,
   username: string,
   botUserId?: number,
 ): boolean {
-  const text = messageText(message);
+  const text = message.text?.trim() ?? message.caption?.trim() ?? '';
   if (!text) return false;
 
   const handle = `@${username.replace(/^@/, '')}`;
@@ -31,33 +66,4 @@ export function messageMentionsBot(
     }
   }
   return false;
-}
-
-export function callsMasterSplinterByName(text: string): boolean {
-  return /\bmaster[\s_-]*splinter\b/i.test(text);
-}
-
-export type SplinterSummonKind = 'command' | 'mention' | 'name';
-
-function isAllowedNonSplinterMessage(text: string): boolean {
-  return isReporterCommand(text) || isUtilityCommand(text);
-}
-
-/** Non-admin tried to reach Master Splinter without using allowed reporter commands. */
-export function detectUnauthorizedSplinterSummon(
-  message: TelegramMessage,
-  env: Env,
-): SplinterSummonKind | null {
-  const text = messageText(message);
-  if (!text) return null;
-
-  if (isMasterSplinterCommand(text)) return null;
-  if (isAllowedNonSplinterMessage(text)) return null;
-
-  const user = resolveBotUsername(env);
-  const botId = env.TELEGRAM_BOT_ID ? Number(env.TELEGRAM_BOT_ID) : undefined;
-  if (messageMentionsBot(message, user, botId)) return 'mention';
-  if (callsMasterSplinterByName(text)) return 'name';
-
-  return null;
 }
