@@ -18,9 +18,15 @@ export interface Env {
   TELEGRAM_BLOCKED_USER_IDS?: string;
   /** Comma-separated Telegram usernames denied bot access (with or without @). */
   TELEGRAM_BLOCKED_USERNAMES?: string;
-  /** Comma-separated IDs allowed to run admin commands (/setup, /master-splinter). */
+  /** Comma-separated numeric IDs allowed to author repo changes (/setup, code via /master-splinter). */
   TELEGRAM_ADMIN_USER_IDS?: string;
-  /** Comma-separated @usernames (no @) treated as admins when IDs are unset or unknown. */
+  /** Single keeper for code changes if set; also may /dojo_grant summoners. */
+  TELEGRAM_CODE_ADMIN_USER_IDS?: string;
+  /** Comma-separated @usernames (no @) who may summon Splinter for questions only. */
+  TELEGRAM_SPLINTER_USERNAMES?: string;
+  /** Comma-separated numeric IDs who may summon Splinter for questions only. */
+  TELEGRAM_SPLINTER_USER_IDS?: string;
+  /** Legacy username summon list (questions only, not code admin). */
   TELEGRAM_ADMIN_USERNAMES?: string;
   /** Secret word for /dojo_grant (Worker secret DOJO_ADMIN_SECRET). */
   DOJO_ADMIN_SECRET?: string;

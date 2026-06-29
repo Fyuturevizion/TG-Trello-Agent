@@ -4,7 +4,8 @@ import {
   type SplinterSummonKind,
 } from './summon';
 import { escapeHtml } from '../telegram-format';
-import { isAdminUser, sendMessage } from '../telegram';
+import { canSummonSplinter } from '../dojo-access';
+import { sendMessage } from '../telegram';
 import type { Env, TelegramMessage } from '../types';
 
 const KV_PREFIX = 'agent:intruder:';
@@ -147,7 +148,7 @@ export async function handleUnauthorizedSplinterSummon(
   message: TelegramMessage,
 ): Promise<boolean> {
   const userId = message.from?.id;
-  if (!userId || (await isAdminUser(env, userId, message.from?.username))) return false;
+  if (!userId || (await canSummonSplinter(env, userId, message.from?.username))) return false;
 
   const kind = detectUnauthorizedSplinterSummon(message, env);
   if (!kind) return false;

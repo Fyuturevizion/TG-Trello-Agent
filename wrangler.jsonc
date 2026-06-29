@@ -37,8 +37,10 @@
     "TELEGRAM_BOT_USERNAME": "WLTH_Triage_Bot",
     // Only this Telegram user may promote admins via /dojo_grant + secret word
     "TELEGRAM_DOJO_KEEPER_ID": "453758488",
-    // Dojo admins — IDs via Worker secret TELEGRAM_ADMIN_USER_IDS; usernames here as backup
-    "TELEGRAM_ADMIN_USERNAMES": "timmetavest,Connor13all"
+    // Dojo admins — numeric IDs via Worker secret TELEGRAM_ADMIN_USER_IDS or TELEGRAM_CODE_ADMIN_USER_IDS
+    // Splinter summoners (questions only) — add new dojo members here or via /dojo_grant
+    "TELEGRAM_SPLINTER_USERNAMES": "Connor13all",
+    "TELEGRAM_ADMIN_USERNAMES": "timmetavest"
   },
   "triggers": {
     "crons": ["* * * * *", "0 8 * * *"]

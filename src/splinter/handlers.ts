@@ -28,16 +28,29 @@ import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText } from '../telegram-message';
 import { escapeHtml } from '../telegram-format';
-import { isAdminUser, sendMessage } from '../telegram';
+import { isCodeAdmin, canSummonSplinter } from '../dojo-access';
+import { sendMessage } from '../telegram';
 import type { Env, TelegramMessage } from '../types';
 
-function buildPrompt(config: AgentConfig, userPrompt: string, isFollowUp: boolean): string {
-  const wrapped = wrapTelegramUserMessage(userPrompt);
+function buildPrompt(
+  config: AgentConfig,
+  userPrompt: string,
+  isFollowUp: boolean,
+  questionsOnly: boolean,
+): string {
+  const wrapped = wrapTelegramUserMessage(userPrompt, { questionsOnly });
   const parts = isFollowUp
     ? [wrapped]
     : [config.systemInstructions, '', '---', '', wrapped];
   parts.push('', TELEGRAM_OUTPUT_RULES);
   return parts.join('\n');
+}
+
+const CODE_ADMIN_SUBCOMMANDS = new Set(['config', 'test', 'test-dm', 'test dm', 'link']);
+
+function isCodeAdminSubcommand(rest: string): boolean {
+  const head = rest.split(/\s+/)[0]?.toLowerCase() ?? '';
+  return CODE_ADMIN_SUBCOMMANDS.has(head) || rest.startsWith('config') || rest.startsWith('link ');
 }
 
 async function runMasterSplinterPrompt(
@@ -46,6 +59,7 @@ async function runMasterSplinterPrompt(
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
+  questionsOnly = false,
 ): Promise<void> {
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
@@ -57,7 +71,16 @@ async function runMasterSplinterPrompt(
   }
 
   if (!rest || rest === 'help') {
-    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML' });
+    await sendMessage(env, chatId, masterSplinterHelpText(questionsOnly), { parseMode: 'HTML' });
+    return;
+  }
+
+  if (questionsOnly && isCodeAdminSubcommand(rest)) {
+    await sendMessage(
+      env,
+      chatId,
+      'Only the dojo code keeper may change the bot or run maintainer commands. You may ask questions.',
+    );
     return;
   }
 
@@ -125,7 +148,16 @@ async function runMasterSplinterPrompt(
   const forceNew = rest.startsWith('new ');
   const userPrompt = forceNew ? rest.slice('new '.length).trim() : rest;
   if (!userPrompt) {
-    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML' });
+    await sendMessage(env, chatId, masterSplinterHelpText(questionsOnly), { parseMode: 'HTML' });
+    return;
+  }
+
+  if (questionsOnly && forceNew) {
+    await sendMessage(
+      env,
+      chatId,
+      'Fresh agent sessions are for the code keeper. Ask your question directly.',
+    );
     return;
   }
 
@@ -134,7 +166,7 @@ async function runMasterSplinterPrompt(
 
   const priorSession = await loadAgentSession(env);
   const session = forceNew ? null : priorSession;
-  const promptText = buildPrompt(config, userPrompt, Boolean(session?.agentId));
+  const promptText = buildPrompt(config, userPrompt, Boolean(session?.agentId), questionsOnly);
 
   const presence = new SplinterPresence(env, chatId);
   await presence.start();
@@ -221,7 +253,7 @@ export async function handleMasterSplinterCommand(
 
   const rest = invocation.rest;
 
-  if (!(await isAdminUser(env, userId, message.from?.username))) {
+  if (!(await canSummonSplinter(env, userId, message.from?.username))) {
     const record = await recordIntruderAttempt(env, userId, 'command');
     await sendMessage(
       env,
@@ -232,7 +264,8 @@ export async function handleMasterSplinterCommand(
     return true;
   }
 
-  await runMasterSplinterPrompt(env, chatId, rest, executionCtx, userId);
+  const questionsOnly = !isCodeAdmin(env, userId);
+  await runMasterSplinterPrompt(env, chatId, rest, executionCtx, userId, questionsOnly);
   return true;
 }
 
@@ -243,11 +276,12 @@ export async function handleAdminSplinterChat(
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
 ): Promise<boolean> {
   const userId = message.from?.id;
-  if (!userId || !(await isAdminUser(env, userId, message.from?.username))) return false;
+  if (!userId || !(await canSummonSplinter(env, userId, message.from?.username))) return false;
   if (!isAdminSplinterPing(message, env)) return false;
 
+  const questionsOnly = !isCodeAdmin(env, userId);
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));
-  await runMasterSplinterPrompt(env, message.chat.id, rest, executionCtx, userId);
+  await runMasterSplinterPrompt(env, message.chat.id, rest, executionCtx, userId, questionsOnly);
   return true;
 }
 

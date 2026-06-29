@@ -4,9 +4,22 @@ import {
   MASTER_SPLINTER_MENU_CMD,
 } from './command';
 
-export function masterSplinterHelpText(): string {
+export function masterSplinterHelpText(questionsOnly = false): string {
+  if (questionsOnly) {
+    return [
+      `<b>${MASTER_SPLINTER_DISPLAY}</b> (dojo member)`,
+      '',
+      'Ask me questions about the triage bot, Trello flow, or QA process.',
+      'I answer in character. I do not change code for members.',
+      `(Telegram menu: <code>${MASTER_SPLINTER_MENU_CMD}</code>, <code>${MASTER_SPLINTER_CMD}</code>)`,
+      '/master-splinter &lt;question&gt;, speak to me',
+      '/master-splinter status, last answer',
+      '/master-splinter cancel, cancel active run',
+    ].join('\n');
+  }
+
   return [
-    `<b>${MASTER_SPLINTER_DISPLAY}</b> (admin only), I maintain the WLTH triage bot`,
+    `<b>${MASTER_SPLINTER_DISPLAY}</b> (code keeper), I maintain the WLTH triage bot`,
     '',
     'I reply in conversation, questions, code changes, all in character.',
     'While I work: typing and meditation quotes (no raw reasoning text).',

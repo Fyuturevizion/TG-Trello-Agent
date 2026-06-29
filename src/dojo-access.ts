@@ -1,7 +1,8 @@
 import { sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
 
-const GRANTED_ADMINS_KEY = 'dojo:granted_admins';
+const GRANTED_SPLINTER_KEY = 'dojo:granted_splinter';
+const LEGACY_GRANTED_ADMINS_KEY = 'dojo:granted_admins';
 const GRANTED_TTL_SECONDS = 365 * 24 * 60 * 60;
 
 /** Hidden command — not registered in BotFather menu. */
@@ -26,48 +27,84 @@ function parseUsernameList(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
-/** The one keeper who may grant admin with the secret word. */
+/** The one keeper who may grant summoners with the secret word. */
 export function isDojoKeeper(env: Env, userId: number): boolean {
   const keeper = env.TELEGRAM_DOJO_KEEPER_ID?.trim();
   if (!keeper) return false;
   return String(userId) === keeper;
 }
 
-async function loadGrantedAdminIds(env: Env): Promise<string[]> {
-  const raw = await env.SESSIONS.get(GRANTED_ADMINS_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((id) => String(id).trim()).filter(Boolean);
-  } catch {
-    return [];
+async function loadGrantedSplinterIds(env: Env): Promise<string[]> {
+  const keys = [GRANTED_SPLINTER_KEY, LEGACY_GRANTED_ADMINS_KEY];
+  const merged: string[] = [];
+  for (const key of keys) {
+    const raw = await env.SESSIONS.get(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) continue;
+      for (const id of parsed) {
+        const s = String(id).trim();
+        if (s) merged.push(s);
+      }
+    } catch {
+      const legacy = Number.parseInt(raw, 10);
+      if (Number.isFinite(legacy)) merged.push(String(legacy));
+    }
   }
+  return [...new Set(merged)];
 }
 
-async function saveGrantedAdminIds(env: Env, ids: string[]): Promise<void> {
+async function saveGrantedSplinterIds(env: Env, ids: string[]): Promise<void> {
   const unique = [...new Set(ids)];
-  await env.SESSIONS.put(GRANTED_ADMINS_KEY, JSON.stringify(unique), {
+  await env.SESSIONS.put(GRANTED_SPLINTER_KEY, JSON.stringify(unique), {
     expirationTtl: GRANTED_TTL_SECONDS,
   });
 }
 
-/** Admin = keeper, TELEGRAM_ADMIN_USER_IDS / USERNAMES, or keeper-granted IDs. */
-export async function isAdminUser(
+/**
+ * May author repo changes via /master-splinter (numeric IDs only, no username fallback).
+ * Keeper + TELEGRAM_CODE_ADMIN_USER_IDS + legacy TELEGRAM_ADMIN_USER_IDS.
+ */
+export function isCodeAdmin(env: Env, userId: number): boolean {
+  if (isDojoKeeper(env, userId)) return true;
+
+  const codeIds = parseUserIdList(env.TELEGRAM_CODE_ADMIN_USER_IDS);
+  if (codeIds.includes(String(userId))) return true;
+
+  const legacyAdminIds = parseUserIdList(env.TELEGRAM_ADMIN_USER_IDS);
+  return legacyAdminIds.includes(String(userId));
+}
+
+/** May speak with Master Splinter (questions). Code changes require isCodeAdmin. */
+export async function canSummonSplinter(
   env: Env,
   userId: number,
   username?: string,
 ): Promise<boolean> {
-  if (isDojoKeeper(env, userId)) return true;
+  if (isCodeAdmin(env, userId)) return true;
 
-  const staticAdmins = parseUserIdList(env.TELEGRAM_ADMIN_USER_IDS);
-  if (staticAdmins.includes(String(userId))) return true;
+  const splinterIds = parseUserIdList(env.TELEGRAM_SPLINTER_USER_IDS);
+  if (splinterIds.includes(String(userId))) return true;
 
-  const adminNames = parseUsernameList(env.TELEGRAM_ADMIN_USERNAMES);
-  if (username && adminNames.includes(username.toLowerCase())) return true;
+  const splinterNames = parseUsernameList(env.TELEGRAM_SPLINTER_USERNAMES);
+  if (username && splinterNames.includes(username.toLowerCase())) return true;
 
-  const granted = await loadGrantedAdminIds(env);
+  // Legacy name list — summon only, not code admin
+  const legacyNames = parseUsernameList(env.TELEGRAM_ADMIN_USERNAMES);
+  if (username && legacyNames.includes(username.toLowerCase())) return true;
+
+  const granted = await loadGrantedSplinterIds(env);
   return granted.includes(String(userId));
+}
+
+/** Setup, /product start, and repo edits — code keeper only (numeric ID). */
+export async function isAdminUser(
+  env: Env,
+  userId: number,
+  _username?: string,
+): Promise<boolean> {
+  return isCodeAdmin(env, userId);
 }
 
 function secretMatches(env: Env, provided: string): boolean {
@@ -78,7 +115,7 @@ function secretMatches(env: Env, provided: string): boolean {
 
 /**
  * /dojo_grant &lt;secret&gt; &lt;telegram_user_id&gt;
- * Only the dojo keeper (TELEGRAM_DOJO_KEEPER_ID) may invoke this.
+ * Keeper-only: grants Splinter summon (questions). Not code admin.
  */
 export async function handleDojoGrantCommand(
   env: Env,
@@ -96,7 +133,7 @@ export async function handleDojoGrantCommand(
     await sendMessage(
       env,
       chatId,
-      'Admin grant is locked. Set DOJO_ADMIN_SECRET on the Worker first.',
+      'Summon grant is locked. Set DOJO_ADMIN_SECRET on the Worker first.',
     );
     return;
   }
@@ -126,34 +163,30 @@ export async function handleDojoGrantCommand(
     return;
   }
 
-  if (isDojoKeeper(env, Number(targetId))) {
-    await sendMessage(env, chatId, 'The keeper is already supreme admin of this dojo.');
+  if (isCodeAdmin(env, Number(targetId))) {
+    await sendMessage(env, chatId, 'That user is already the code keeper or a code admin.');
     return;
   }
 
-  const staticAdmins = parseUserIdList(env.TELEGRAM_ADMIN_USER_IDS);
-  if (staticAdmins.includes(targetId)) {
-    await sendMessage(env, chatId, `User <code>${targetId}</code> is already a fixed admin.`, {
-      parseMode: 'HTML',
-    });
-    return;
-  }
-
-  const granted = await loadGrantedAdminIds(env);
+  const granted = await loadGrantedSplinterIds(env);
   if (granted.includes(targetId)) {
-    await sendMessage(env, chatId, `User <code>${targetId}</code> already has admin.`, {
+    await sendMessage(env, chatId, `User <code>${targetId}</code> may already summon Splinter.`, {
       parseMode: 'HTML',
     });
     return;
   }
 
   granted.push(targetId);
-  await saveGrantedAdminIds(env, granted);
+  await saveGrantedSplinterIds(env, granted);
 
   await sendMessage(
     env,
     chatId,
-    `Granted admin to <code>${targetId}</code>. They may use <code>/master_splinter</code> and <code>/setup</code>.`,
+    [
+      `Granted Splinter summon to <code>${targetId}</code>.`,
+      'They may use <code>/master_splinter</code> for questions.',
+      'Only the code keeper may request repo changes.',
+    ].join('\n'),
     { parseMode: 'HTML' },
   );
 }

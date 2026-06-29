@@ -39,14 +39,28 @@ Your entire reply is one conversational message from ${MASTER_SPLINTER_DISPLAY} 
 Write like you are speaking to your student in the channel, not writing a formal report.
 Keep it under ~2000 words.`.trim();
 
-export function wrapTelegramUserMessage(userPrompt: string): string {
-  return [
-    `Message from the dojo admin via ${MASTER_SPLINTER_CMD} (Telegram):`,
+export const SUMMONER_ONLY_RULES = `
+CRITICAL: This messenger is a dojo member, NOT the code keeper. They may ask questions only.
+- Do NOT edit the repository, open PRs, commit, or deploy.
+- Answer in 2 to 10 sentences in character.
+- If they request a code change, say only the dojo keeper may author changes.
+`.trim();
+
+export function wrapTelegramUserMessage(
+  userPrompt: string,
+  options?: { questionsOnly?: boolean },
+): string {
+  const who = options?.questionsOnly ? 'a dojo member' : 'the dojo admin';
+  const parts = [
+    `Message from ${who} via ${MASTER_SPLINTER_CMD} (Telegram):`,
     userPrompt,
     '',
     '---',
     MASTER_SPLINTER_VOICE,
-    '',
-    TELEGRAM_REPLY_FORMAT,
-  ].join('\n');
+  ];
+  if (options?.questionsOnly) {
+    parts.push('', SUMMONER_ONLY_RULES);
+  }
+  parts.push('', TELEGRAM_REPLY_FORMAT);
+  return parts.join('\n');
 }
