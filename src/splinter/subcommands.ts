@@ -8,6 +8,8 @@ import {
 } from './config';
 import { cancelRun, getAgent, getRun, isTerminalRunStatus } from '../cursor-api';
 import { parseAgentId } from '../cursor-client';
+import { postChannelTriggersToChat } from '../channel';
+import { addExtraQaChatId } from '../qa-chats';
 import { tryDeliverPendingSplinterRun } from './poll-delivery';
 import { deliverRunReply, prepareSplinterReplyText } from './relay';
 import { MASTER_SPLINTER_CMD } from './command';
@@ -192,6 +194,34 @@ export async function handleMasterSplinterConfig(
 
   await saveAgentConfig(env, config);
   await sendMessage(env, chatId, `Updated config: <b>${escapeHtml(key)}</b>`, { parseMode: 'HTML' });
+}
+
+export async function handleMasterSplinterAllowQa(env: Env, chatId: number, chatType: string): Promise<void> {
+  const allowedTypes = new Set(['group', 'supergroup', 'channel']);
+  if (!allowedTypes.has(chatType)) {
+    await sendMessage(
+      env,
+      chatId,
+      'Run this from the QA group or channel you want to register, not in a private chat.',
+    );
+    return;
+  }
+
+  const ids = await addExtraQaChatId(env, chatId);
+  await postChannelTriggersToChat(env, chatId);
+
+  await sendMessage(
+    env,
+    chatId,
+    [
+      'This chat is now on the QA allowlist.',
+      `Chat ID: <code>${chatId}</code>`,
+      `Registered channels: ${ids.length}`,
+      '',
+      'Pinned triage buttons are refreshed. Reporters can use /report here again.',
+    ].join('\n'),
+    { parseMode: 'HTML' },
+  );
 }
 
 export async function ensureRepoConfigured(env: Env, chatId: number): Promise<AgentConfig | null> {

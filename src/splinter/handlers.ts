@@ -20,6 +20,7 @@ import {
   ensureRepoConfigured,
   handleMasterSplinterCancel,
   handleMasterSplinterConfig,
+  handleMasterSplinterAllowQa,
   handleMasterSplinterLink,
   handleMasterSplinterReset,
   handleMasterSplinterStatus,
@@ -46,6 +47,7 @@ async function runMasterSplinterPrompt(
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
+  chatType?: string,
 ): Promise<void> {
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
@@ -58,6 +60,11 @@ async function runMasterSplinterPrompt(
 
   if (!rest || rest === 'help') {
     await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML' });
+    return;
+  }
+
+  if (rest === 'allow-qa' || rest === 'allow qa') {
+    await handleMasterSplinterAllowQa(env, chatId, chatType ?? 'private');
     return;
   }
 
@@ -172,7 +179,7 @@ async function runMasterSplinterPrompt(
     });
     kickSplinterPollChain(env, executionCtx);
     executionCtx.waitUntil(
-      streamPresenceWhileRunning(env, started.agentId, started.runId, presence),
+      streamPresenceWhileRunning(env, started.agentId, started.runId, presence, executionCtx),
     );
   } catch (error) {
     await presence.finish();
@@ -232,7 +239,7 @@ export async function handleMasterSplinterCommand(
     return true;
   }
 
-  await runMasterSplinterPrompt(env, chatId, rest, executionCtx, userId);
+  await runMasterSplinterPrompt(env, chatId, rest, executionCtx, userId, message.chat.type);
   return true;
 }
 
@@ -247,7 +254,14 @@ export async function handleAdminSplinterChat(
   if (!isAdminSplinterPing(message, env)) return false;
 
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));
-  await runMasterSplinterPrompt(env, message.chat.id, rest, executionCtx, userId);
+  await runMasterSplinterPrompt(
+    env,
+    message.chat.id,
+    rest,
+    executionCtx,
+    userId,
+    message.chat.type,
+  );
   return true;
 }
 

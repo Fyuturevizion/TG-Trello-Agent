@@ -27,7 +27,7 @@ export function masterSplinterHelpText(): string {
     '/master-splinter config session-limit &lt;n&gt;',
     '/master-splinter config instructions &lt;text&gt;',
     '/master-splinter new &lt;message&gt;, force a fresh agent session',
-    '/master-splinter test, post sample card update to QA channel',
+    '/master-splinter allow-qa, register this chat as QA + refresh buttons',
     '/master-splinter test-dm, send sample review DM to you',
   ].join('\n');
 }

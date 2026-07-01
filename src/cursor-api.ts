@@ -106,5 +106,6 @@ export async function cancelRun(env: Env, agentId: string, runId: string): Promi
 }
 
 export function isTerminalRunStatus(status: string): boolean {
-  return ['FINISHED', 'ERROR', 'CANCELLED', 'EXPIRED'].includes(status);
+  const normalized = status.trim().toUpperCase();
+  return ['FINISHED', 'ERROR', 'CANCELLED', 'EXPIRED'].includes(normalized);
 }

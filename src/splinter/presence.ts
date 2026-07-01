@@ -168,7 +168,7 @@ export class SplinterPresence {
         this.env,
         this.chatId,
         this.messageId,
-        '◌ <b>Master Splinter</b> · Still on the mat. Send <code>/master_splinter status</code> for my answer.',
+        '◌ <b>Master Splinter</b> · Still on the mat. I will post here when I am finished.',
         undefined,
         'HTML',
       );

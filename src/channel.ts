@@ -3,12 +3,12 @@ import type { BrowserKey } from './browsers';
 import { deviceDisplayLabel } from './devices';
 import type { DeviceKey } from './devices';
 import { escapeHtml, formatBoardLine, formatCardUpdateMessage, formatReporterMention } from './telegram-format';
-import { sendMessage } from './telegram';
+import { pinChatMessage, sendMessage } from './telegram';
 import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
 import { resolveBotUsername } from './bot-identity';
 import { loadActiveProduct } from './product/session';
-import { parseQaChatIds, primaryQaChatId } from './qa-chats';
+import { getAllQaChatIds, primaryQaChatIdAsync } from './qa-chats';
 
 export async function announceNewCard(
   env: Env,
@@ -24,7 +24,7 @@ export async function announceNewCard(
     reporterFirstName?: string;
   },
 ): Promise<void> {
-  const chatIds = parseQaChatIds(env);
+  const chatIds = await getAllQaChatIds(env);
   if (chatIds.length === 0) return;
 
   const mention = formatReporterMention(input);
@@ -52,7 +52,7 @@ const TEST_CARD_URL = 'https://trello.com/c/8kTHpNjt';
 
 /** Admin-only sample notification for verifying HTML card links in the QA channel. */
 export async function sendTestCardUpdate(env: Env): Promise<boolean> {
-  const chatId = primaryQaChatId(env);
+  const chatId = await primaryQaChatIdAsync(env);
   if (chatId === null) return false;
 
   const text = formatCardUpdateMessage({
@@ -90,12 +90,32 @@ export async function announceTrelloEvent(
   env: Env,
   lines: string[],
 ): Promise<void> {
-  const chatIds = parseQaChatIds(env);
+  const chatIds = await getAllQaChatIds(env);
   if (chatIds.length === 0) return;
 
   const text = lines.join('\n');
   for (const chatId of chatIds) {
     await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  }
+}
+
+/** Post pinned triage buttons in one QA chat. */
+export async function postChannelTriggersToChat(env: Env, chatId: number): Promise<void> {
+  const sent = await sendMessage(
+    env,
+    chatId,
+    [
+      'WLTH QA Triage',
+      '',
+      'Tap a button to open the report form. One message is posted here when a card is submitted.',
+    ].join('\n'),
+    { replyMarkup: await channelTriggerKeyboard(env) },
+  );
+
+  try {
+    await pinChatMessage(env, chatId, sent.message_id);
+  } catch {
+    // Bot may need admin rights to pin
   }
 }
 
