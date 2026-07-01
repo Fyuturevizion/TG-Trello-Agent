@@ -1,9 +1,12 @@
 import { streamAgentRun } from '../cursor-stream';
+import { kickSplinterPollChain, pollSplinterRunOnce } from './poll-delivery';
 import { loadPendingSplinterRun, patchPendingSplinterRun } from './pending-run';
 import type { SplinterPresence } from './presence';
 import type { Env } from '../types';
 
 const PRESENCE_STREAM_MS = 25_000;
+
+type WaitUntilContext = Pick<ExecutionContext, 'waitUntil'>;
 
 function toolCallDone(status: string): boolean {
   const s = status.toLowerCase();
@@ -19,6 +22,7 @@ export async function streamPresenceWhileRunning(
   agentId: string,
   runId: string,
   presence: SplinterPresence,
+  executionCtx?: WaitUntilContext,
 ): Promise<void> {
   const abort = AbortSignal.timeout(PRESENCE_STREAM_MS);
   let streamedText = '';
@@ -50,5 +54,13 @@ export async function streamPresenceWhileRunning(
   }
 
   const stillPending = await loadPendingSplinterRun(env);
-  if (stillPending) await presence.showPendingHint();
+  if (stillPending) {
+    await presence.showPendingHint();
+    if (executionCtx) {
+      kickSplinterPollChain(env, executionCtx);
+      executionCtx.waitUntil(
+        pollSplinterRunOnce(env, executionCtx as ExecutionContext).catch(() => {}),
+      );
+    }
+  }
 }

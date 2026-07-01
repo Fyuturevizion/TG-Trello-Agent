@@ -64,9 +64,12 @@ export async function dispatchTelegramMessage(
 
   if (await handleAdminSplinterChat(env, message, executionCtx)) return;
 
-  const inQaChannel = isAllowedChat(env, message.chat.id, message.chat.type);
-  const adminDm = message.chat.type === 'private' && (await isAdminUser(env, userId));
-  if (!inQaChannel && !adminDm) {
+  const token = commandToken(text);
+  const adminUser = await isAdminUser(env, userId);
+  const inQaChannel = await isAllowedChat(env, message.chat.id, message.chat.type);
+  const adminDm = message.chat.type === 'private' && adminUser;
+  const adminSetup = token === '/setup' && adminUser;
+  if (!inQaChannel && !adminDm && !adminSetup) {
     if (isReporterCommand(text)) {
       const bot = resolveBotUsername(env);
       await sendMessage(
@@ -75,7 +78,7 @@ export async function dispatchTelegramMessage(
         [
           'This chat is not registered as a WLTH QA channel.',
           `Chat ID: <code>${message.chat.id}</code>`,
-          'Ask the admin to add it to <code>TELEGRAM_QA_CHAT_ID</code> (comma-separated for multiple channels).',
+          'Ask the admin to run <code>/master_splinter allow-qa</code> here, or add this chat ID to <code>TELEGRAM_QA_CHAT_ID</code>.',
           `In groups with privacy mode, use <code>/report@${bot}</code> or <code>/master_splinter@${bot}</code>.`,
         ].join('\n'),
         { parseMode: 'HTML' },

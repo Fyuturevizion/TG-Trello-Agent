@@ -1,4 +1,4 @@
-import { isQaChat, parseQaChatIds } from './qa-chats';
+import { getAllQaChatIds } from './qa-chats';
 import type { Env } from './types';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -137,9 +137,13 @@ export async function setWebhook(env: Env, webhookUrl: string): Promise<void> {
   });
 }
 
-export function isAllowedChat(env: Env, chatId: number, chatType?: string): boolean {
-  const ids = parseQaChatIds(env);
-  if (ids.length > 0) return isQaChat(env, chatId);
+export async function isAllowedChat(
+  env: Env,
+  chatId: number,
+  chatType?: string,
+): Promise<boolean> {
+  const ids = await getAllQaChatIds(env);
+  if (ids.length > 0) return ids.includes(chatId);
   // Fallback if unset: any group/supergroup/channel the bot is in
   return chatType === 'group' || chatType === 'supergroup' || chatType === 'channel';
 }
