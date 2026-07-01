@@ -1,3 +1,4 @@
+import { postChannelTriggers } from '../bot-handlers';
 import { announceProductClosed, announceProductOpened } from './announce';
 import { createProductHubCard } from './trello';
 import {
@@ -101,6 +102,11 @@ export async function handleProductMessage(env: Env, message: TelegramMessage): 
     }
     await clearActiveProduct(env);
     await announceProductClosed(env, active.displayName);
+    try {
+      await postChannelTriggers(env);
+    } catch {
+      // Bot may lack pin rights; admin can run /setup manually.
+    }
     await sendMessage(
       env,
       chatId,
@@ -166,6 +172,11 @@ export async function handleProductMessage(env: Env, message: TelegramMessage): 
     };
     await saveActiveProduct(env, campaign);
     await announceProductOpened(env, { displayName, shortUrl: hub.shortUrl });
+    try {
+      await postChannelTriggers(env);
+    } catch {
+      // Bot may lack pin rights; admin can run /setup manually.
+    }
 
     await sendMessage(
       env,
@@ -176,7 +187,7 @@ export async function handleProductMessage(env: Env, message: TelegramMessage): 
         'One Trello card — each area has its own checklist; submissions append as items + comments.',
         `<a href="${escapeHtml(hub.shortUrl)}">${escapeHtml(hub.name)}</a>`,
         '',
-        'Tell the team to use <code>/product</code> or run <code>/setup</code> to refresh channel buttons.',
+        'Channel buttons are refreshed. Reporters can tap <b>Product feedback</b> or send <code>/product</code>.',
       ].join('\n'),
       { parseMode: 'HTML' },
     );
