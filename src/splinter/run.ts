@@ -5,7 +5,15 @@ import {
   saveAgentSession,
   type AgentConfig,
 } from './config';
-import { archiveAgent, createCloudAgent, followUpAgent, getAgent } from '../cursor-api';
+import {
+  archiveAgent,
+  cancelRun,
+  createCloudAgent,
+  followUpAgent,
+  getAgent,
+  getRun,
+  isTerminalRunStatus,
+} from '../cursor-api';
 import type { Env } from '../types';
 
 export interface StartedCloudRun {
@@ -13,6 +21,15 @@ export interface StartedCloudRun {
   runId: string;
   agentUrl?: string;
   freshSession: boolean;
+}
+
+function isAgentBusyError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes('409') || msg.toLowerCase().includes('agent_busy');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 async function archiveSessionAgent(env: Env): Promise<void> {
@@ -25,6 +42,55 @@ async function archiveSessionAgent(env: Env): Promise<void> {
   }
 }
 
+async function cancelActiveRun(env: Env, agentId: string, runId: string): Promise<void> {
+  try {
+    const run = await getRun(env, agentId, runId);
+    if (!isTerminalRunStatus(run.status)) {
+      await cancelRun(env, agentId, runId);
+      await sleep(1200);
+    }
+  } catch {
+    // run may already be gone
+  }
+}
+
+async function followUpOnSession(
+  env: Env,
+  config: AgentConfig,
+  session: NonNullable<Awaited<ReturnType<typeof loadAgentSession>>>,
+  promptText: string,
+): Promise<StartedCloudRun> {
+  const model = { id: config.modelId, params: modelParamsForConfig(config) };
+  const agent = await getAgent(env, session.agentId);
+
+  if (session.latestRunId) {
+    await cancelActiveRun(env, session.agentId, session.latestRunId);
+  }
+
+  try {
+    const { run } = await followUpAgent(env, session.agentId, promptText, model);
+    return {
+      agentId: session.agentId,
+      runId: run.id,
+      agentUrl: agent.url ?? session.agentUrl,
+      freshSession: false,
+    };
+  } catch (error) {
+    if (!isAgentBusyError(error) || !session.latestRunId) {
+      throw error;
+    }
+    await cancelRun(env, session.agentId, session.latestRunId);
+    await sleep(1500);
+    const { run } = await followUpAgent(env, session.agentId, promptText, model);
+    return {
+      agentId: session.agentId,
+      runId: run.id,
+      agentUrl: agent.url ?? session.agentUrl,
+      freshSession: false,
+    };
+  }
+}
+
 export async function startMasterSplinterRun(
   env: Env,
   config: AgentConfig,
@@ -32,7 +98,6 @@ export async function startMasterSplinterRun(
   runName: string,
   forceNew = false,
 ): Promise<StartedCloudRun> {
-  const model = { id: config.modelId, params: modelParamsForConfig(config) };
   let session = forceNew ? null : await loadAgentSession(env);
 
   if (
@@ -48,13 +113,7 @@ export async function startMasterSplinterRun(
     try {
       const agent = await getAgent(env, session.agentId);
       if (agent.status === 'ACTIVE' || agent.status === 'CREATING') {
-        const { run } = await followUpAgent(env, session.agentId, promptText, model);
-        return {
-          agentId: session.agentId,
-          runId: run.id,
-          agentUrl: agent.url ?? session.agentUrl,
-          freshSession: false,
-        };
+        return followUpOnSession(env, config, session, promptText);
       }
     } catch {
       // fall through to new agent

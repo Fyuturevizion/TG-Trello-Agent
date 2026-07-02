@@ -26,6 +26,8 @@ export interface AgentConfig {
 export interface AgentSession {
   agentId: string;
   latestRunId?: string;
+  /** Last run whose reply was posted to Telegram (avoids duplicate delivery). */
+  lastDeliveredRunId?: string;
   agentUrl?: string;
   notifyChatId: number;
   lastPrompt?: string;

@@ -2,8 +2,8 @@ import { tryDeliverPendingSplinterRun } from './splinter/poll-delivery';
 import { getWebhookInfo } from './telegram';
 import type { Env } from './types';
 
-export async function runPendingSplinterCron(env: Env): Promise<void> {
-  const delivered = await tryDeliverPendingSplinterRun(env);
+export async function runPendingSplinterCron(env: Env, ctx?: ExecutionContext): Promise<void> {
+  const delivered = await tryDeliverPendingSplinterRun(env, ctx);
   if (delivered) {
     console.log(JSON.stringify({ event: 'pending_splinter_delivered' }));
   }

@@ -13,6 +13,7 @@ import {
 } from './command';
 import { extractAdminSplinterPrompt, isAdminSplinterPing } from './admin-chat';
 import { savePendingSplinterRun } from './pending-run';
+import { supersedePendingSplinterRun } from './poll-delivery';
 import { persistRunSession, startMasterSplinterRun } from './run';
 import { archiveAgent } from '../cursor-api';
 import { SplinterPresence } from './presence';
@@ -62,7 +63,7 @@ async function runMasterSplinterPrompt(
   }
 
   if (rest === 'status') {
-    await handleMasterSplinterStatus(env, chatId);
+    await handleMasterSplinterStatus(env, chatId, executionCtx);
     return;
   }
 
@@ -132,6 +133,8 @@ async function runMasterSplinterPrompt(
   const config = await ensureRepoConfigured(env, chatId);
   if (!config) return;
 
+  await supersedePendingSplinterRun(env);
+
   const priorSession = await loadAgentSession(env);
   const session = forceNew ? null : priorSession;
   const promptText = buildPrompt(config, userPrompt, Boolean(session?.agentId));
@@ -172,7 +175,7 @@ async function runMasterSplinterPrompt(
     });
     kickSplinterPollChain(env, executionCtx);
     executionCtx.waitUntil(
-      streamPresenceWhileRunning(env, started.agentId, started.runId, presence),
+      streamPresenceWhileRunning(env, started.agentId, started.runId, presence, executionCtx),
     );
   } catch (error) {
     await presence.finish();

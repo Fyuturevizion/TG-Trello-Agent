@@ -244,7 +244,7 @@ export default {
   ): Promise<void> {
     ctx.waitUntil(
       Promise.all([
-        runPendingSplinterCron(env),
+        runPendingSplinterCron(env, ctx),
         controller.cron === '0 8 * * *' ? runWebhookWatchdog(env) : Promise.resolve(),
       ]).catch((error) => {
         console.error(

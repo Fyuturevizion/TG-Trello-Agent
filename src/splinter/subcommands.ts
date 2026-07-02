@@ -8,15 +8,43 @@ import {
 } from './config';
 import { cancelRun, getAgent, getRun, isTerminalRunStatus } from '../cursor-api';
 import { parseAgentId } from '../cursor-client';
-import { tryDeliverPendingSplinterRun } from './poll-delivery';
+import {
+  deliverLatestSessionRun,
+  resumeSplinterPollChain,
+  tryDeliverPendingSplinterRun,
+} from './poll-delivery';
+import { loadPendingSplinterRun } from './pending-run';
 import { deliverRunReply, prepareSplinterReplyText } from './relay';
 import { MASTER_SPLINTER_CMD } from './command';
 import { escapeHtml, markdownToTelegramHtml } from '../telegram-format';
 import { sendMessage } from '../telegram';
 import type { Env } from '../types';
 
-export async function handleMasterSplinterStatus(env: Env, chatId: number): Promise<void> {
-  if (await tryDeliverPendingSplinterRun(env)) {
+export async function handleMasterSplinterStatus(
+  env: Env,
+  chatId: number,
+  executionCtx?: Pick<ExecutionContext, 'waitUntil'>,
+): Promise<void> {
+  if (await tryDeliverPendingSplinterRun(env, executionCtx)) {
+    return;
+  }
+
+  if (await deliverLatestSessionRun(env, chatId)) {
+    return;
+  }
+
+  const pending = await loadPendingSplinterRun(env);
+  if (pending) {
+    resumeSplinterPollChain(env, executionCtx);
+    await sendMessage(
+      env,
+      chatId,
+      [
+        'My student, I am still working on your last request.',
+        'I will post here when Cursor finishes — no need to send <code>/master_splinter status</code> repeatedly.',
+      ].join('\n'),
+      { parseMode: 'HTML' },
+    );
     return;
   }
 

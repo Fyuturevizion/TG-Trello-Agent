@@ -105,6 +105,10 @@ export async function cancelRun(env: Env, agentId: string, runId: string): Promi
   await cursorFetch(env, `/v1/agents/${agentId}/runs/${runId}/cancel`, { method: 'POST' });
 }
 
+export function normalizeRunStatus(status: string): string {
+  return status.trim().toUpperCase();
+}
+
 export function isTerminalRunStatus(status: string): boolean {
-  return ['FINISHED', 'ERROR', 'CANCELLED', 'EXPIRED'].includes(status);
+  return ['FINISHED', 'ERROR', 'CANCELLED', 'EXPIRED'].includes(normalizeRunStatus(status));
 }

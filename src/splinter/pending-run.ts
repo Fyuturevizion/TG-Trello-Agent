@@ -1,3 +1,4 @@
+import { deleteMessage } from '../telegram';
 import type { Env } from '../types';
 
 const PENDING_KEY = 'agent:pending';
@@ -44,4 +45,25 @@ export async function patchPendingSplinterRun(
   const current = await loadPendingSplinterRun(env);
   if (!current) return;
   await savePendingSplinterRun(env, { ...current, ...patch });
+}
+
+export async function dismissPendingPresence(env: Env, pending: PendingSplinterRun): Promise<void> {
+  if (!pending.presenceMessageId) return;
+  try {
+    await deleteMessage(env, pending.chatId, pending.presenceMessageId);
+  } catch {
+    // already gone
+  }
+}
+
+export function pendingMatchesRun(
+  pending: PendingSplinterRun | null,
+  agentId: string,
+  runId: string,
+  presenceMessageId?: number,
+): boolean {
+  if (!pending) return false;
+  if (pending.agentId !== agentId || pending.runId !== runId) return false;
+  if (presenceMessageId && pending.presenceMessageId !== presenceMessageId) return false;
+  return true;
 }
