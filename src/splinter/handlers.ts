@@ -26,6 +26,8 @@ import {
   handleMasterSplinterStatus,
 } from './subcommands';
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
+import { addQaChatId } from '../qa-chats';
+import { isAllowQaChannelRequest } from './qa-channel';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText } from '../telegram-message';
 import { escapeHtml } from '../telegram-format';
@@ -41,6 +43,30 @@ function buildPrompt(config: AgentConfig, userPrompt: string, isFollowUp: boolea
   return parts.join('\n');
 }
 
+async function handleAllowQaChannel(env: Env, chatId: number): Promise<void> {
+  const result = await addQaChatId(env, chatId);
+  if (result.added) {
+    await sendMessage(
+      env,
+      chatId,
+      [
+        `This channel (<code>${chatId}</code>) is now on the QA allowlist, apprentice.`,
+        'Trello card updates and triage announcements will post here automatically.',
+        'No more chasing me for status.',
+      ].join('\n'),
+      { parseMode: 'HTML' },
+    );
+    return;
+  }
+
+  await sendMessage(
+    env,
+    chatId,
+    `This channel (<code>${chatId}</code>) was already registered for QA updates.`,
+    { parseMode: 'HTML' },
+  );
+}
+
 async function runMasterSplinterPrompt(
   env: Env,
   chatId: number,
@@ -48,6 +74,11 @@ async function runMasterSplinterPrompt(
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
 ): Promise<void> {
+  if (isAllowQaChannelRequest(rest)) {
+    await handleAllowQaChannel(env, chatId);
+    return;
+  }
+
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
       env,

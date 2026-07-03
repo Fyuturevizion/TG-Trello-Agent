@@ -64,7 +64,7 @@ export async function dispatchTelegramMessage(
 
   if (await handleAdminSplinterChat(env, message, executionCtx)) return;
 
-  const inQaChannel = isAllowedChat(env, message.chat.id, message.chat.type);
+  const inQaChannel = await isAllowedChat(env, message.chat.id, message.chat.type);
   const adminDm = message.chat.type === 'private' && (await isAdminUser(env, userId));
   if (!inQaChannel && !adminDm) {
     if (isReporterCommand(text)) {
