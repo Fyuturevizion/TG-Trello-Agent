@@ -1,4 +1,5 @@
 import { DOJO_GRANT_CMD, handleDojoGrantCommand } from '../dojo-access';
+import { isContentBot } from '../splinter/persona';
 import { handleAdminSplinterChat, handleMasterSplinterCommand } from '../splinter/handlers';
 import { handleUnauthorizedSplinterSummon } from '../splinter/intruder';
 import { handleBotMessage } from '../bot-handlers';
@@ -64,7 +65,12 @@ export async function dispatchTelegramMessage(
 
   if (await handleAdminSplinterChat(env, message, executionCtx)) return;
 
-  const inQaChannel = isAllowedChat(env, message.chat.id, message.chat.type);
+  if (isContentBot(env)) {
+    if (await handleUnauthorizedSplinterSummon(env, message)) return;
+    return;
+  }
+
+  const inQaChannel = await isAllowedChat(env, message.chat.id, message.chat.type);
   const adminDm = message.chat.type === 'private' && (await isAdminUser(env, userId));
   if (!inQaChannel && !adminDm) {
     if (isReporterCommand(text)) {

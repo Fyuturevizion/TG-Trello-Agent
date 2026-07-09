@@ -1,0 +1,39 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "donatello-splinterson-bot",
+  "account_id": "53d52ffd40feb5356ce596aadef30109",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "REPLACE_WITH_DONATELLO_KV_ID"
+    }
+  ],
+  "vars": {
+    "SESSION_TTL_SECONDS": "3600",
+    "SPLINTER_BOT_MODE": "content",
+    "SPLINTER_DISPLAY_NAME": "Donatello_Splinterson",
+    "WEBAPP_URL": "https://donatello-splinterson-bot.baris-53d.workers.dev",
+    "CURSOR_AGENT_REPO_URL": "https://github.com/Fyuturevizion/TG-Trello-Agent",
+    "CURSOR_AGENT_REPO_REF": "main",
+    "CURSOR_AGENT_MODEL": "composer-2.5",
+    "CURSOR_AGENT_AUTO_PR": "true",
+    "CURSOR_AGENT_FAST": "true",
+    "CURSOR_AGENT_MAX_SESSION_PROMPTS": "8",
+    "TELEGRAM_BOT_USERNAME": "donatello_splinterson_bot",
+    "TELEGRAM_DOJO_KEEPER_ID": "453758488"
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  }
+}
