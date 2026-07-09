@@ -27,14 +27,27 @@ import {
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
 import { addQaChatId } from '../qa-chats';
 import { isAllowQaChannelRequest } from './qa-channel';
+import { isContentBot } from './persona';
+import {
+  canSummonSplinter,
+  grantSplinterMember,
+  isCodeAdmin,
+  isDojoKeeper,
+} from '../dojo-access';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText } from '../telegram-message';
 import { escapeHtml } from '../telegram-format';
-import { isAdminUser, sendMessage } from '../telegram';
+import { sendMessage } from '../telegram';
 import type { Env, TelegramMessage } from '../types';
 
-function buildPrompt(config: AgentConfig, userPrompt: string, isFollowUp: boolean): string {
-  const wrapped = wrapTelegramUserMessage(userPrompt);
+function buildPrompt(
+  env: Env,
+  config: AgentConfig,
+  userPrompt: string,
+  isFollowUp: boolean,
+  questionsOnly: boolean,
+): string {
+  const wrapped = wrapTelegramUserMessage(env, userPrompt, { questionsOnly });
   const parts = isFollowUp
     ? [wrapped]
     : [config.systemInstructions, '', '---', '', wrapped];
@@ -42,16 +55,26 @@ function buildPrompt(config: AgentConfig, userPrompt: string, isFollowUp: boolea
   return parts.join('\n');
 }
 
+const CODE_ADMIN_SUBCOMMANDS = new Set(['config', 'test', 'test-dm', 'test dm', 'link']);
+
+function isCodeAdminSubcommand(rest: string): boolean {
+  const head = rest.split(/\s+/)[0]?.toLowerCase() ?? '';
+  return CODE_ADMIN_SUBCOMMANDS.has(head) || rest.startsWith('config') || rest.startsWith('link ');
+}
+
 async function handleAllowQaChannel(env: Env, chatId: number): Promise<void> {
   const result = await addQaChatId(env, chatId);
+  const channelKind = isContentBot(env) ? 'content' : 'QA';
   if (result.added) {
     await sendMessage(
       env,
       chatId,
       [
-        `This channel (<code>${chatId}</code>) is now on the QA allowlist, apprentice.`,
-        'Trello card updates and triage announcements will post here automatically.',
-        'No more chasing me for status.',
+        `This channel (<code>${chatId}</code>) is now on the ${channelKind} allowlist, apprentice.`,
+        isContentBot(env)
+          ? 'Your content team may summon me here with /master_splinter.'
+          : 'Trello card updates and triage announcements will post here automatically.',
+        'Use /master-splinter add-member &lt;user_id&gt; to invite teammates.',
       ].join('\n'),
       { parseMode: 'HTML' },
     );
@@ -61,7 +84,7 @@ async function handleAllowQaChannel(env: Env, chatId: number): Promise<void> {
   await sendMessage(
     env,
     chatId,
-    `This channel (<code>${chatId}</code>) was already registered for QA updates.`,
+    `This channel (<code>${chatId}</code>) was already registered for ${channelKind} work.`,
     { parseMode: 'HTML' },
   );
 }
@@ -72,9 +95,24 @@ async function runMasterSplinterPrompt(
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
+  questionsOnly = false,
 ): Promise<void> {
   if (isAllowQaChannelRequest(rest)) {
+    if (!userId || !isDojoKeeper(env, userId)) {
+      await sendMessage(env, chatId, 'Only the dojo keeper may register this channel.');
+      return;
+    }
     await handleAllowQaChannel(env, chatId);
+    return;
+  }
+
+  if (rest.startsWith('add-member ') || rest.startsWith('add member ')) {
+    if (!userId || !isDojoKeeper(env, userId)) {
+      await sendMessage(env, chatId, 'Only the dojo keeper may add members.');
+      return;
+    }
+    const target = rest.replace(/^add[- ]member\s+/i, '').trim();
+    await grantSplinterMember(env, chatId, target);
     return;
   }
 
@@ -88,7 +126,16 @@ async function runMasterSplinterPrompt(
   }
 
   if (!rest || rest === 'help') {
-    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML' });
+    await sendMessage(env, chatId, masterSplinterHelpText(env, questionsOnly), { parseMode: 'HTML' });
+    return;
+  }
+
+  if (questionsOnly && isCodeAdminSubcommand(rest)) {
+    await sendMessage(
+      env,
+      chatId,
+      'Only the dojo keeper may change settings or run maintainer commands. You may ask questions.',
+    );
     return;
   }
 
@@ -118,6 +165,10 @@ async function runMasterSplinterPrompt(
   }
 
   if (rest === 'test') {
+    if (isContentBot(env)) {
+      await sendMessage(env, chatId, 'Test card updates are for the triage bot only.');
+      return;
+    }
     const posted = await sendTestCardUpdate(env);
     if (!posted) {
       await sendMessage(env, chatId, 'Could not post test message. Check TELEGRAM_QA_CHAT_ID is set.');
@@ -133,6 +184,10 @@ async function runMasterSplinterPrompt(
   }
 
   if (rest === 'test-dm' || rest === 'test dm') {
+    if (isContentBot(env)) {
+      await sendMessage(env, chatId, 'Test review DMs are for the triage bot only.');
+      return;
+    }
     if (!userId) return;
     try {
       await sendTestReviewDm(env, userId);
@@ -156,7 +211,16 @@ async function runMasterSplinterPrompt(
   const forceNew = rest.startsWith('new ');
   const userPrompt = forceNew ? rest.slice('new '.length).trim() : rest;
   if (!userPrompt) {
-    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML' });
+    await sendMessage(env, chatId, masterSplinterHelpText(env, questionsOnly), { parseMode: 'HTML' });
+    return;
+  }
+
+  if (questionsOnly && forceNew) {
+    await sendMessage(
+      env,
+      chatId,
+      'Fresh agent sessions are for the keeper. Ask your question directly.',
+    );
     return;
   }
 
@@ -165,7 +229,7 @@ async function runMasterSplinterPrompt(
 
   const priorSession = await loadAgentSession(env);
   const session = forceNew ? null : priorSession;
-  const promptText = buildPrompt(config, userPrompt, Boolean(session?.agentId));
+  const promptText = buildPrompt(env, config, userPrompt, Boolean(session?.agentId), questionsOnly);
 
   const presence = new SplinterPresence(env, chatId);
   await presence.start();
@@ -252,7 +316,7 @@ export async function handleMasterSplinterCommand(
 
   const rest = invocation.rest;
 
-  if (!(await isAdminUser(env, userId))) {
+  if (!(await canSummonSplinter(env, userId, message.from?.username))) {
     const record = await recordIntruderAttempt(env, userId, 'command');
     await sendMessage(
       env,
@@ -263,22 +327,24 @@ export async function handleMasterSplinterCommand(
     return true;
   }
 
-  await runMasterSplinterPrompt(env, chatId, rest, executionCtx, userId);
+  const questionsOnly = !isCodeAdmin(env, userId);
+  await runMasterSplinterPrompt(env, chatId, rest, executionCtx, userId, questionsOnly);
   return true;
 }
 
-/** Admin ping without slash command (@master_splinter, @WLTH_Triage_Bot, "Master Splinter …"). */
+/** Keeper or summoner ping without slash command (@bot, persona name, …). */
 export async function handleAdminSplinterChat(
   env: Env,
   message: TelegramMessage,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
 ): Promise<boolean> {
   const userId = message.from?.id;
-  if (!userId || !(await isAdminUser(env, userId))) return false;
+  if (!userId || !(await canSummonSplinter(env, userId, message.from?.username))) return false;
   if (!isAdminSplinterPing(message, env)) return false;
 
+  const questionsOnly = !isCodeAdmin(env, userId);
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));
-  await runMasterSplinterPrompt(env, message.chat.id, rest, executionCtx, userId);
+  await runMasterSplinterPrompt(env, message.chat.id, rest, executionCtx, userId, questionsOnly);
   return true;
 }
 

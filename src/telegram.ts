@@ -148,7 +148,7 @@ export async function isAllowedChat(
   return chatType === 'group' || chatType === 'supergroup' || chatType === 'channel';
 }
 
-export { isAdminUser, isDojoKeeper } from './dojo-access';
+export { isAdminUser, isDojoKeeper, isCodeAdmin, canSummonSplinter } from './dojo-access';
 
 function parseUserIdList(raw: string | undefined): string[] {
   if (!raw?.trim()) return [];

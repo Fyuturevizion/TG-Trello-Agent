@@ -1,5 +1,5 @@
-import { MASTER_SPLINTER_DISPLAY } from '../brand';
-import { MASTER_SPLINTER_VOICE, TELEGRAM_REPLY_FORMAT } from './prompts';
+import { resolveSplinterDisplay, splinterRepoBlurb } from './persona';
+import { splinterVoice, telegramReplyFormat } from './prompts';
 import type { Env } from '../types';
 
 const CONFIG_KEY = 'agent:config';
@@ -33,16 +33,19 @@ export interface AgentSession {
   updatedAt: string;
 }
 
-const DEFAULT_INSTRUCTIONS = [
-  'You maintain the WLTH Telegram → Trello triage bot (Cloudflare Worker, Hono, Mini App in public/, webhooks).',
-  `You are ${MASTER_SPLINTER_DISPLAY}, the sensei of this dojo. Speak only as ${MASTER_SPLINTER_DISPLAY}. Never say /agent in Telegram replies. Never use em dashes (—) or en dashes (–).`,
-  'Make minimal, focused changes. Match existing code style.',
-  '',
-  MASTER_SPLINTER_VOICE,
-  '',
-  `Every Telegram reply is one conversational message from ${MASTER_SPLINTER_DISPLAY}, no "Answer" headings or report sections.`,
-  TELEGRAM_REPLY_FORMAT,
-].join('\n');
+function defaultInstructions(env: Env): string {
+  const display = resolveSplinterDisplay(env);
+  return [
+    splinterRepoBlurb(env),
+    `You are ${display}, the sensei of this dojo. Speak only as ${display}. Never say /agent in Telegram replies. Never use em dashes (—) or en dashes (–).`,
+    'Make minimal, focused changes. Match existing code style.',
+    '',
+    splinterVoice(env),
+    '',
+    `Every Telegram reply is one conversational message from ${display}, no "Answer" headings or report sections.`,
+    telegramReplyFormat(env),
+  ].join('\n');
+}
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
   const n = Number(raw);
@@ -56,7 +59,7 @@ export function defaultAgentConfig(env: Env): AgentConfig {
     startingRef: env.CURSOR_AGENT_REPO_REF?.trim() || 'main',
     modelId: env.CURSOR_AGENT_MODEL?.trim() || 'composer-2.5',
     autoCreatePR: env.CURSOR_AGENT_AUTO_PR === 'true',
-    systemInstructions: DEFAULT_INSTRUCTIONS,
+    systemInstructions: defaultInstructions(env),
     fastMode: fastDefault,
     maxSessionPrompts: parsePositiveInt(env.CURSOR_AGENT_MAX_SESSION_PROMPTS, 8),
   };

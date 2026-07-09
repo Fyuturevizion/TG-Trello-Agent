@@ -17,7 +17,8 @@
     "setup:splinter-photo": "tsx scripts/setup-splinter-photo.ts",
     "setup:bot-profile": "tsx scripts/setup-bot-profile.ts",
     "setup:trello-webhook": "tsx scripts/setup-trello-webhook.ts",
-    "setup:all": "npm run setup:menu && npm run setup:channel && npm run setup:trello-webhook",
+    "setup:donatello": "tsx scripts/setup-donatello.ts",
+    "deploy:donatello": "tsx scripts/deploy-donatello.ts",
     "resolve-trello-ids": "tsx scripts/resolve-trello-ids.ts",
     "ensure-native-app-device": "tsx scripts/ensure-native-app-option.ts"
   },
