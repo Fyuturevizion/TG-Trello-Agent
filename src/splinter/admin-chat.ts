@@ -1,4 +1,5 @@
 import { isReporterCommand, isUtilityCommand, textContainsReporterCommand } from '../commands/registry';
+import { DOJO_GRANT_CMD } from '../dojo-access';
 import { resolveBotUsername } from '../bot-identity';
 import { messageText } from '../telegram-message';
 import { isMasterSplinterCommand } from './command';
@@ -17,6 +18,10 @@ export function isAdminSplinterPing(message: TelegramMessage, env: Env): boolean
   if (isReporterCommand(text) || isUtilityCommand(text) || textContainsReporterCommand(text)) {
     return false;
   }
+  if (text.trim().startsWith(DOJO_GRANT_CMD)) return false;
+
+  // A private chat with the bot is always "speaking to Splinter" for admins.
+  if (message.chat.type === 'private') return true;
 
   const bot = resolveBotUsername(env);
   const botId = env.TELEGRAM_BOT_ID ? Number(env.TELEGRAM_BOT_ID) : undefined;

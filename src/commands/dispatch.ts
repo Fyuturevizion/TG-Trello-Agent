@@ -5,6 +5,7 @@ import { handleBotMessage } from '../bot-handlers';
 import { isAdminUser, isAllowedChat, isBlockedUser, sendMessage } from '../telegram';
 import { commandToken, isReporterCommand, isUtilityCommand } from './registry';
 import { resolveBotUsername } from '../bot-identity';
+import { sendThreadOptions } from '../telegram-message';
 import type { Env, TelegramMessage, TelegramUpdate } from '../types';
 
 async function handleUtilityCommand(env: Env, message: TelegramMessage): Promise<boolean> {
@@ -19,6 +20,7 @@ async function handleUtilityCommand(env: Env, message: TelegramMessage): Promise
       env,
       chatId,
       [`Chat ID: ${chatId}`, `Type: ${message.chat.type}`].join('\n'),
+      sendThreadOptions(message),
     );
     return true;
   }
@@ -26,7 +28,7 @@ async function handleUtilityCommand(env: Env, message: TelegramMessage): Promise
   if (token === '/myid') {
     const lines = [`Your user ID: ${from.id}`];
     if (from.username) lines.push(`Username: @${from.username}`);
-    await sendMessage(env, chatId, lines.join('\n'));
+    await sendMessage(env, chatId, lines.join('\n'), sendThreadOptions(message));
     return true;
   }
 
@@ -78,7 +80,19 @@ export async function dispatchTelegramMessage(
           'Ask the admin to add it to <code>TELEGRAM_QA_CHAT_ID</code> (comma-separated for multiple channels).',
           `In groups with privacy mode, use <code>/report@${bot}</code> or <code>/master_splinter@${bot}</code>.`,
         ].join('\n'),
-        { parseMode: 'HTML' },
+        { parseMode: 'HTML', ...sendThreadOptions(message) },
+      );
+    } else if (message.chat.type === 'private' && text) {
+      const bot = resolveBotUsername(env);
+      await sendMessage(
+        env,
+        message.chat.id,
+        [
+          'Master Splinter is for dojo admins only.',
+          `For triage, use <code>/report</code> or <code>/help</code>.`,
+          `Admins: <code>/master_splinter@${bot}</code> or open this DM and type your question.`,
+        ].join('\n'),
+        { parseMode: 'HTML', ...sendThreadOptions(message) },
       );
     }
     return;

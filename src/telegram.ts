@@ -1,4 +1,4 @@
-import { isQaChat, parseQaChatIds } from './qa-chats';
+import { isQaChat, isDojoChat, parseAllowedChatIds } from './qa-chats';
 import type { Env } from './types';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -50,6 +50,7 @@ export async function sendMessage(
   options?: {
     replyMarkup?: ReplyMarkup;
     parseMode?: 'Markdown' | 'HTML';
+    messageThreadId?: number;
   },
 ): Promise<{ message_id: number }> {
   return telegramRequest(env, 'sendMessage', {
@@ -57,6 +58,7 @@ export async function sendMessage(
     text,
     parse_mode: options?.parseMode,
     reply_markup: options?.replyMarkup,
+    message_thread_id: options?.messageThreadId,
   });
 }
 
@@ -67,6 +69,7 @@ export async function editMessageText(
   text: string,
   replyMarkup?: ReplyMarkup,
   parseMode?: 'HTML' | 'Markdown',
+  messageThreadId?: number,
 ): Promise<void> {
   await telegramRequest(env, 'editMessageText', {
     chat_id: chatId,
@@ -74,22 +77,35 @@ export async function editMessageText(
     text,
     parse_mode: parseMode,
     reply_markup: replyMarkup,
+    message_thread_id: messageThreadId,
   });
 }
 
 export type ChatAction = 'typing' | 'upload_photo' | 'record_video' | 'upload_video';
 
-export async function sendChatAction(env: Env, chatId: number, action: ChatAction): Promise<void> {
+export async function sendChatAction(
+  env: Env,
+  chatId: number,
+  action: ChatAction,
+  messageThreadId?: number,
+): Promise<void> {
   await telegramRequest(env, 'sendChatAction', {
     chat_id: chatId,
     action,
+    message_thread_id: messageThreadId,
   });
 }
 
-export async function deleteMessage(env: Env, chatId: number, messageId: number): Promise<void> {
+export async function deleteMessage(
+  env: Env,
+  chatId: number,
+  messageId: number,
+  messageThreadId?: number,
+): Promise<void> {
   await telegramRequest(env, 'deleteMessage', {
     chat_id: chatId,
     message_id: messageId,
+    message_thread_id: messageThreadId,
   });
 }
 
@@ -138,8 +154,8 @@ export async function setWebhook(env: Env, webhookUrl: string): Promise<void> {
 }
 
 export function isAllowedChat(env: Env, chatId: number, chatType?: string): boolean {
-  const ids = parseQaChatIds(env);
-  if (ids.length > 0) return isQaChat(env, chatId);
+  const ids = parseAllowedChatIds(env);
+  if (ids.length > 0) return isQaChat(env, chatId) || isDojoChat(env, chatId);
   // Fallback if unset: any group/supergroup/channel the bot is in
   return chatType === 'group' || chatType === 'supergroup' || chatType === 'channel';
 }

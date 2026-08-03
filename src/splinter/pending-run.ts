@@ -8,6 +8,8 @@ export interface PendingSplinterRun {
   agentId: string;
   runId: string;
   chatId: number;
+  /** Forum topic thread for replies in supergroups with topics. */
+  messageThreadId?: number;
   createdAt: string;
   /** Meditation message to delete after the real reply is sent. */
   presenceMessageId?: number;
@@ -50,7 +52,12 @@ export async function patchPendingSplinterRun(
 export async function dismissPendingPresence(env: Env, pending: PendingSplinterRun): Promise<void> {
   if (!pending.presenceMessageId) return;
   try {
-    await deleteMessage(env, pending.chatId, pending.presenceMessageId);
+    await deleteMessage(
+      env,
+      pending.chatId,
+      pending.presenceMessageId,
+      pending.messageThreadId,
+    );
   } catch {
     // already gone
   }

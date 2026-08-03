@@ -27,7 +27,7 @@ import {
 } from './subcommands';
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
 import { resolveBotUsername } from '../bot-identity';
-import { commandRoutingText, messageText } from '../telegram-message';
+import { commandRoutingText, messageText, messageThreadId } from '../telegram-message';
 import { escapeHtml } from '../telegram-format';
 import { isAdminUser, sendMessage } from '../telegram';
 import type { Env, TelegramMessage } from '../types';
@@ -41,63 +41,86 @@ function buildPrompt(config: AgentConfig, userPrompt: string, isFollowUp: boolea
   return parts.join('\n');
 }
 
+type ReplyTarget = { chatId: number; messageThreadId?: number };
+
+function replyTarget(chatId: number, messageThreadId?: number): ReplyTarget {
+  return messageThreadId ? { chatId, messageThreadId } : { chatId };
+}
+
+function threadOpts(target: ReplyTarget) {
+  return target.messageThreadId ? { messageThreadId: target.messageThreadId } : {};
+}
+
 async function runMasterSplinterPrompt(
   env: Env,
-  chatId: number,
+  target: ReplyTarget,
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
 ): Promise<void> {
+  const chatId = target.chatId;
+  const opts = threadOpts(target);
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
       env,
       chatId,
       'Cursor API is not configured. Add CURSOR_API_KEY as a Worker secret (Cursor Dashboard → Integrations).',
+      opts,
     );
     return;
   }
 
   if (!rest || rest === 'help') {
-    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML' });
+    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML', ...opts });
     return;
   }
 
   if (rest === 'status') {
-    await handleMasterSplinterStatus(env, chatId, executionCtx);
+    await handleMasterSplinterStatus(env, chatId, executionCtx, target.messageThreadId);
     return;
   }
 
   if (rest.startsWith('link ')) {
-    await handleMasterSplinterLink(env, chatId, rest.slice('link '.length));
+    await handleMasterSplinterLink(env, chatId, rest.slice('link '.length), target.messageThreadId);
     return;
   }
 
   if (rest === 'reset') {
-    await handleMasterSplinterReset(env, chatId);
+    await handleMasterSplinterReset(env, chatId, target.messageThreadId);
     return;
   }
 
   if (rest === 'cancel') {
-    await handleMasterSplinterCancel(env, chatId);
+    await handleMasterSplinterCancel(env, chatId, target.messageThreadId);
     return;
   }
 
   if (rest.startsWith('config')) {
-    await handleMasterSplinterConfig(env, chatId, rest.slice('config'.length).trim());
+    await handleMasterSplinterConfig(
+      env,
+      chatId,
+      rest.slice('config'.length).trim(),
+      target.messageThreadId,
+    );
     return;
   }
 
   if (rest === 'test') {
     const posted = await sendTestCardUpdate(env);
     if (!posted) {
-      await sendMessage(env, chatId, 'Could not post test message. Check TELEGRAM_QA_CHAT_ID is set.');
+      await sendMessage(
+        env,
+        chatId,
+        'Could not post test message. Check TELEGRAM_QA_CHAT_ID is set.',
+        opts,
+      );
       return;
     }
     await sendMessage(
       env,
       chatId,
       'Test card update posted to the QA channel. Tap <b>link to the card</b> there to confirm HTML links work.',
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', ...opts },
     );
     return;
   }
@@ -110,14 +133,14 @@ async function runMasterSplinterPrompt(
         env,
         chatId,
         'Sample review DM sent to your private chat with the bot. Open our DM thread if you do not see it yet.',
-        { parseMode: 'HTML' },
+        { parseMode: 'HTML', ...opts },
       );
     } catch (error) {
       await sendMessage(
         env,
         chatId,
         `Could not send test DM. Start a private chat with the bot first (tap Start), then try again.\n${escapeHtml(error instanceof Error ? error.message : String(error))}`,
-        { parseMode: 'HTML' },
+        { parseMode: 'HTML', ...opts },
       );
     }
     return;
@@ -126,11 +149,11 @@ async function runMasterSplinterPrompt(
   const forceNew = rest.startsWith('new ');
   const userPrompt = forceNew ? rest.slice('new '.length).trim() : rest;
   if (!userPrompt) {
-    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML' });
+    await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML', ...opts });
     return;
   }
 
-  const config = await ensureRepoConfigured(env, chatId);
+  const config = await ensureRepoConfigured(env, chatId, target.messageThreadId);
   if (!config) return;
 
   await supersedePendingSplinterRun(env);
@@ -139,7 +162,7 @@ async function runMasterSplinterPrompt(
   const session = forceNew ? null : priorSession;
   const promptText = buildPrompt(config, userPrompt, Boolean(session?.agentId));
 
-  const presence = new SplinterPresence(env, chatId);
+  const presence = new SplinterPresence(env, chatId, target.messageThreadId);
   await presence.start();
 
   try {
@@ -170,6 +193,7 @@ async function runMasterSplinterPrompt(
       agentId: started.agentId,
       runId: started.runId,
       chatId,
+      messageThreadId: target.messageThreadId,
       createdAt: new Date().toISOString(),
       presenceMessageId: presence.getMessageId(),
     });
@@ -194,7 +218,7 @@ async function runMasterSplinterPrompt(
       env,
       chatId,
       `My student, I could not begin: ${escapeHtml(raw)}${hint}`,
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', ...opts },
     );
   }
 }
@@ -217,7 +241,10 @@ export async function handleMasterSplinterCommand(
       env,
       chatId,
       `Could not read that command. Try <code>${MASTER_SPLINTER_CMD} help</code>.`,
-      { parseMode: 'HTML' },
+      {
+        parseMode: 'HTML',
+        ...(messageThreadId(message) ? { messageThreadId: messageThreadId(message) } : {}),
+      },
     );
     return true;
   }
@@ -230,12 +257,18 @@ export async function handleMasterSplinterCommand(
       env,
       chatId,
       buildIntruderReply(record, message.from?.username, message.from?.first_name, 'command'),
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', ...(messageThreadId(message) ? { messageThreadId: messageThreadId(message) } : {}) },
     );
     return true;
   }
 
-  await runMasterSplinterPrompt(env, chatId, rest, executionCtx, userId);
+  await runMasterSplinterPrompt(
+    env,
+    replyTarget(chatId, messageThreadId(message)),
+    rest,
+    executionCtx,
+    userId,
+  );
   return true;
 }
 
@@ -250,7 +283,13 @@ export async function handleAdminSplinterChat(
   if (!isAdminSplinterPing(message, env)) return false;
 
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));
-  await runMasterSplinterPrompt(env, message.chat.id, rest, executionCtx, userId);
+  await runMasterSplinterPrompt(
+    env,
+    replyTarget(message.chat.id, messageThreadId(message)),
+    rest,
+    executionCtx,
+    userId,
+  );
   return true;
 }
 

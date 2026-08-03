@@ -10,6 +10,8 @@ export interface Env {
   TELEGRAM_WEBHOOK_SECRET: string;
   /** One or more QA supergroup IDs, comma-separated (e.g. -100111,-100222). */
   TELEGRAM_QA_CHAT_ID: string;
+  /** Growth Hub Dojo supergroup (forum) — always treated as an allowed chat. */
+  TELEGRAM_DOJO_CHAT_ID?: string;
   /** Dojo keeper — only this user may run /dojo_grant with the secret word. */
   TELEGRAM_DOJO_KEEPER_ID?: string;
   /** Comma-separated Telegram user IDs allowed to use bot commands. */
@@ -100,6 +102,9 @@ export interface TelegramMessage {
   entities?: TelegramMessageEntity[];
   caption_entities?: TelegramMessageEntity[];
   photo?: Array<{ file_id: string; file_unique_id: string }>;
+  /** Forum topic thread id (supergroups with topics enabled). */
+  message_thread_id?: number;
+  reply_to_message?: TelegramMessage;
 }
 
 export interface TelegramCallbackQuery {

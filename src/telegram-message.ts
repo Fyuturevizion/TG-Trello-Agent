@@ -5,6 +5,16 @@ export function messageText(message: TelegramMessage): string {
   return (message.text ?? message.caption ?? '').trim();
 }
 
+/** Forum topic thread id when the message was sent inside a topic. */
+export function messageThreadId(message: TelegramMessage): number | undefined {
+  return message.message_thread_id;
+}
+
+export function sendThreadOptions(message: TelegramMessage): { messageThreadId?: number } {
+  const thread = messageThreadId(message);
+  return thread ? { messageThreadId: thread } : {};
+}
+
 /** Command token from a bot_command entity when present (handles odd clients). */
 export function botCommandFromMessage(message: TelegramMessage): string | null {
   const text = message.text ?? '';

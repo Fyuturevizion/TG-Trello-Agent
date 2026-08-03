@@ -35,6 +35,8 @@
     "CURSOR_AGENT_MAX_SESSION_PROMPTS": "8",
     // Must match BotFather username exactly (no @). Update after Edit Username.
     "TELEGRAM_BOT_USERNAME": "WLTH_Triage_Bot",
+    // Growth Hub - Dojo forum supergroup (always allowed for triage + Splinter)
+    "TELEGRAM_DOJO_CHAT_ID": "-1004465145918",
     // Only this Telegram user may promote admins via /dojo_grant + secret word
     "TELEGRAM_DOJO_KEEPER_ID": "453758488"
   },

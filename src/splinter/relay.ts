@@ -53,10 +53,16 @@ export function formatRunForTelegram(run: CursorRun): string {
   return body;
 }
 
-async function sendSplinterReply(env: Env, chatId: number, markdownBody: string): Promise<void> {
+async function sendSplinterReply(
+  env: Env,
+  chatId: number,
+  markdownBody: string,
+  messageThreadId?: number,
+): Promise<void> {
+  const opts = messageThreadId ? { messageThreadId } : {};
   const trimmed = prepareSplinterReplyText(markdownBody);
   if (!trimmed) {
-    await sendMessage(env, chatId, '(No reply text.)', { parseMode: 'HTML' });
+    await sendMessage(env, chatId, '(No reply text.)', { parseMode: 'HTML', ...opts });
     return;
   }
 
@@ -68,16 +74,22 @@ async function sendSplinterReply(env: Env, chatId: number, markdownBody: string)
     const prefix =
       htmlParts.length > 1 && i > 0 ? `<i>(${i + 1}/${htmlParts.length})</i>\n\n` : '';
     try {
-      await sendMessage(env, chatId, `${prefix}${htmlParts[i]}`, { parseMode: 'HTML' });
+      await sendMessage(env, chatId, `${prefix}${htmlParts[i]}`, { parseMode: 'HTML', ...opts });
     } catch {
       const plainPrefix =
         plainParts.length > 1 && i > 0 ? `(${i + 1}/${plainParts.length})\n\n` : '';
-      await sendMessage(env, chatId, `${plainPrefix}${plainParts[i] ?? ''}`);
+      await sendMessage(env, chatId, `${plainPrefix}${plainParts[i] ?? ''}`, opts);
     }
   }
 }
 
-export async function deliverRunReply(env: Env, chatId: number, run: CursorRun): Promise<void> {
+export async function deliverRunReply(
+  env: Env,
+  chatId: number,
+  run: CursorRun,
+  messageThreadId?: number,
+): Promise<void> {
+  const opts = messageThreadId ? { messageThreadId, parseMode: 'HTML' as const } : { parseMode: 'HTML' as const };
   if (!isTerminalRunStatus(run.status)) {
     await sendMessage(
       env,
@@ -86,7 +98,7 @@ export async function deliverRunReply(env: Env, chatId: number, run: CursorRun):
         'My student, I am still on the mat with your request, the run has not finished yet.',
         `Try <code>${MASTER_SPLINTER_CMD} status</code> in a minute — I will post the answer when Cursor finishes.`,
       ].join('\n\n'),
-      { parseMode: 'HTML' },
+      opts,
     );
     return;
   }
@@ -98,13 +110,13 @@ export async function deliverRunReply(env: Env, chatId: number, run: CursorRun):
         env,
         chatId,
         `<i>${escapeHtml(run.status)}</i>\n\n${body}`,
-        { parseMode: 'HTML' },
+        opts,
       );
     } catch {
-      await sendMessage(env, chatId, formatRunForTelegram(run));
+      await sendMessage(env, chatId, formatRunForTelegram(run), messageThreadId ? { messageThreadId } : {});
     }
     return;
   }
 
-  await sendSplinterReply(env, chatId, formatRunForTelegram(run));
+  await sendSplinterReply(env, chatId, formatRunForTelegram(run), messageThreadId);
 }

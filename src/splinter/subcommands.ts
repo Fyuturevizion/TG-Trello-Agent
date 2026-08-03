@@ -20,16 +20,22 @@ import { escapeHtml, markdownToTelegramHtml } from '../telegram-format';
 import { sendMessage } from '../telegram';
 import type { Env } from '../types';
 
+function threadOpts(messageThreadId?: number) {
+  return messageThreadId ? { messageThreadId } : {};
+}
+
 export async function handleMasterSplinterStatus(
   env: Env,
   chatId: number,
   executionCtx?: Pick<ExecutionContext, 'waitUntil'>,
+  messageThreadId?: number,
 ): Promise<void> {
+  const opts = threadOpts(messageThreadId);
   if (await tryDeliverPendingSplinterRun(env, executionCtx)) {
     return;
   }
 
-  if (await deliverLatestSessionRun(env, chatId)) {
+  if (await deliverLatestSessionRun(env, chatId, messageThreadId)) {
     return;
   }
 
@@ -43,16 +49,19 @@ export async function handleMasterSplinterStatus(
         'My student, I am still working on your last request.',
         'I will post here when Cursor finishes — no need to send <code>/master_splinter status</code> repeatedly.',
       ].join('\n'),
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', ...opts },
     );
     return;
   }
 
   const session = await loadAgentSession(env);
   if (!session) {
-    await sendMessage(env, chatId, `No session yet, my student. Use ${MASTER_SPLINTER_CMD} &lt;message&gt; to begin.`, {
-      parseMode: 'HTML',
-    });
+    await sendMessage(
+      env,
+      chatId,
+      `No session yet, my student. Use ${MASTER_SPLINTER_CMD} &lt;message&gt; to begin.`,
+      { parseMode: 'HTML', ...opts },
+    );
     return;
   }
 
@@ -65,7 +74,7 @@ export async function handleMasterSplinterStatus(
     if (session.latestRunId) {
       const run = await getRun(env, session.agentId, session.latestRunId);
       if (isTerminalRunStatus(run.status)) {
-        await deliverRunReply(env, chatId, run);
+        await deliverRunReply(env, chatId, run, messageThreadId);
         return;
       }
       lines.push(`Last run: <i>${escapeHtml(run.status)}</i> (still in progress)`);
@@ -74,13 +83,13 @@ export async function handleMasterSplinterStatus(
         `When Cursor finishes, send <code>${MASTER_SPLINTER_CMD} status</code> again for my reply.`,
       );
     }
-    await sendMessage(env, chatId, lines.join('\n'), { parseMode: 'HTML' });
+    await sendMessage(env, chatId, lines.join('\n'), { parseMode: 'HTML', ...opts });
   } catch (error) {
     await sendMessage(
       env,
       chatId,
       escapeHtml(error instanceof Error ? error.message : String(error)),
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', ...opts },
     );
   }
 }
@@ -89,7 +98,9 @@ export async function handleMasterSplinterLink(
   env: Env,
   chatId: number,
   linkArg: string,
+  messageThreadId?: number,
 ): Promise<void> {
+  const opts = threadOpts(messageThreadId);
   const agentId = parseAgentId(linkArg);
   if (!agentId) {
     await sendMessage(
@@ -131,37 +142,51 @@ export async function handleMasterSplinterLink(
     ];
     if (agent.name) lines.push(`Name: <i>${escapeHtml(agent.name)}</i>`);
     if (lastReply) lines.push('', markdownToTelegramHtml(lastReply));
-    await sendMessage(env, chatId, lines.join('\n'), { parseMode: 'HTML' });
+    await sendMessage(env, chatId, lines.join('\n'), { parseMode: 'HTML', ...opts });
   } catch (error) {
     await sendMessage(
       env,
       chatId,
       escapeHtml(error instanceof Error ? error.message : String(error)),
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', ...opts },
     );
   }
 }
 
-export async function handleMasterSplinterReset(env: Env, chatId: number): Promise<void> {
+export async function handleMasterSplinterReset(
+  env: Env,
+  chatId: number,
+  messageThreadId?: number,
+): Promise<void> {
   await clearAgentSession(env);
-  await sendMessage(env, chatId, `Session cleared, young one. Your next ${MASTER_SPLINTER_CMD} begins anew.`);
+  await sendMessage(
+    env,
+    chatId,
+    `Session cleared, young one. Your next ${MASTER_SPLINTER_CMD} begins anew.`,
+    threadOpts(messageThreadId),
+  );
 }
 
-export async function handleMasterSplinterCancel(env: Env, chatId: number): Promise<void> {
+export async function handleMasterSplinterCancel(
+  env: Env,
+  chatId: number,
+  messageThreadId?: number,
+): Promise<void> {
+  const opts = threadOpts(messageThreadId);
   const session = await loadAgentSession(env);
   if (!session?.latestRunId) {
-    await sendMessage(env, chatId, 'Nothing to cancel.');
+    await sendMessage(env, chatId, 'Nothing to cancel.', opts);
     return;
   }
   try {
     await cancelRun(env, session.agentId, session.latestRunId);
-    await sendMessage(env, chatId, 'Cancel requested for the active run.');
+    await sendMessage(env, chatId, 'Cancel requested for the active run.', opts);
   } catch (error) {
     await sendMessage(
       env,
       chatId,
       escapeHtml(error instanceof Error ? error.message : String(error)),
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', ...opts },
     );
   }
 }
@@ -170,7 +195,9 @@ export async function handleMasterSplinterConfig(
   env: Env,
   chatId: number,
   cfgRest: string,
+  messageThreadId?: number,
 ): Promise<void> {
+  const opts = threadOpts(messageThreadId);
   const config = await loadAgentConfig(env);
 
   if (!cfgRest) {
@@ -188,7 +215,7 @@ export async function handleMasterSplinterConfig(
         '',
         escapeHtml(config.systemInstructions.slice(0, 500)),
       ].join('\n'),
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', ...opts },
     );
     return;
   }
@@ -204,7 +231,7 @@ export async function handleMasterSplinterConfig(
   else if (key === 'session-limit' && value) {
     const n = Number(value);
     if (!Number.isFinite(n) || n < 1) {
-      await sendMessage(env, chatId, 'session-limit must be a positive number.');
+      await sendMessage(env, chatId, 'session-limit must be a positive number.', opts);
       return;
     }
     config.maxSessionPrompts = Math.floor(n);
@@ -214,15 +241,23 @@ export async function handleMasterSplinterConfig(
       env,
       chatId,
       'Unknown config key. Try: repo, branch, model, pr, fast, session-limit, instructions',
+      opts,
     );
     return;
   }
 
   await saveAgentConfig(env, config);
-  await sendMessage(env, chatId, `Updated config: <b>${escapeHtml(key)}</b>`, { parseMode: 'HTML' });
+  await sendMessage(env, chatId, `Updated config: <b>${escapeHtml(key)}</b>`, {
+    parseMode: 'HTML',
+    ...opts,
+  });
 }
 
-export async function ensureRepoConfigured(env: Env, chatId: number): Promise<AgentConfig | null> {
+export async function ensureRepoConfigured(
+  env: Env,
+  chatId: number,
+  messageThreadId?: number,
+): Promise<AgentConfig | null> {
   const config = await loadAgentConfig(env);
   if (config.repoUrl) return config;
 
@@ -235,6 +270,7 @@ export async function ensureRepoConfigured(env: Env, chatId: number): Promise<Ag
       '',
       'Or set CURSOR_AGENT_REPO_URL on the Worker.',
     ].join('\n'),
+    threadOpts(messageThreadId),
   );
   return null;
 }

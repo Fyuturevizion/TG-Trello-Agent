@@ -71,7 +71,7 @@ export async function deliverPendingIfReady(
         ? { ...run, result: pending.streamedText }
         : run;
 
-    await deliverRunReply(env, pending.chatId, merged);
+    await deliverRunReply(env, pending.chatId, merged, pending.messageThreadId);
     await markRunDelivered(env, pending.runId);
     await dismissPendingPresence(env, pending);
     await clearPendingSplinterRun(env);
@@ -90,7 +90,11 @@ export async function deliverPendingIfReady(
 }
 
 /** Deliver a finished run from session when pending KV was lost or superseded. */
-export async function deliverLatestSessionRun(env: Env, chatId: number): Promise<boolean> {
+export async function deliverLatestSessionRun(
+  env: Env,
+  chatId: number,
+  messageThreadId?: number,
+): Promise<boolean> {
   const session = await loadAgentSession(env);
   if (!session?.latestRunId || session.notifyChatId !== chatId) return false;
   if (session.lastDeliveredRunId === session.latestRunId) return false;
@@ -98,7 +102,7 @@ export async function deliverLatestSessionRun(env: Env, chatId: number): Promise
   try {
     const run = await getRun(env, session.agentId, session.latestRunId);
     if (!isTerminalRunStatus(run.status)) return false;
-    await deliverRunReply(env, chatId, run);
+    await deliverRunReply(env, chatId, run, messageThreadId);
     await saveAgentSession(env, { ...session, lastDeliveredRunId: session.latestRunId });
     return true;
   } catch (error) {

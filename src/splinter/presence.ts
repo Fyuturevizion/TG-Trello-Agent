@@ -54,6 +54,7 @@ export class SplinterPresence {
   constructor(
     private readonly env: Env,
     private readonly chatId: number,
+    private readonly messageThreadId?: number,
   ) {}
 
   private rotateQuote(): void {
@@ -75,17 +76,19 @@ export class SplinterPresence {
   }
 
   async start(): Promise<void> {
-    await sendChatAction(this.env, this.chatId, 'typing');
+    await sendChatAction(this.env, this.chatId, 'typing', this.messageThreadId);
     const msg = await sendMessage(
       this.env,
       this.chatId,
       formatPresence(0, this.state, this.meditation),
-      { parseMode: 'HTML' },
+      { parseMode: 'HTML', messageThreadId: this.messageThreadId },
     );
     this.messageId = msg.message_id;
 
     this.typingTimer = setInterval(() => {
-      if (!this.stopped) void sendChatAction(this.env, this.chatId, 'typing').catch(() => {});
+      if (!this.stopped) {
+        void sendChatAction(this.env, this.chatId, 'typing', this.messageThreadId).catch(() => {});
+      }
     }, TYPING_INTERVAL_MS);
 
     this.frameTimer = setInterval(() => {
@@ -144,6 +147,7 @@ export class SplinterPresence {
         formatPresence(this.tick, this.state, this.meditation),
         undefined,
         'HTML',
+        this.messageThreadId,
       );
     } catch {
       // flood limit or message unchanged
@@ -171,6 +175,7 @@ export class SplinterPresence {
         '◌ <b>Master Splinter</b> · Still on the mat. Send <code>/master_splinter status</code> for my answer.',
         undefined,
         'HTML',
+        this.messageThreadId,
       );
     } catch {
       // message gone
@@ -182,7 +187,7 @@ export class SplinterPresence {
     this.stopTimers();
     if (!this.messageId) return;
     try {
-      await deleteMessage(this.env, this.chatId, this.messageId);
+      await deleteMessage(this.env, this.chatId, this.messageId, this.messageThreadId);
     } catch {
       // already removed
     }
