@@ -1,6 +1,6 @@
 import { MASTER_SPLINTER_CMD } from './command';
 import { sanitizeSplinterReply } from './reply-sanitize';
-import { isTerminalRunStatus, type CursorRun } from '../cursor-api';
+import { isTerminalRunStatus, normalizeRunStatus, type CursorRun } from '../cursor-api';
 import { escapeHtml, markdownToTelegramHtml } from '../telegram-format';
 import { sendMessage } from '../telegram';
 import type { Env } from '../types';
@@ -37,17 +37,26 @@ export function prepareSplinterReplyText(
   );
 }
 
-export function formatRunForTelegram(run: CursorRun): string {
+export function formatRunForTelegram(run: CursorRun, streamError?: string): string {
   const git = run.git?.branches?.[0];
   let body = prepareSplinterReplyText(run.result?.trim() ?? '', {
     branch: git?.branch,
     prUrl: git?.prUrl,
   });
   if (!body) {
-    body =
-      run.status === 'FINISHED'
-        ? 'My student, I have finished, but I have no words for you this time. Ask again.'
-        : `My student, the run ended with status: ${run.status}.`;
+    if (run.status === 'FINISHED') {
+      body = 'My student, I have finished, but I have no words for you this time. Ask again.';
+    } else if (normalizeRunStatus(run.status) === 'ERROR') {
+      const detail = streamError?.trim();
+      body = [
+        'My student, the cloud mat stumbled before I could answer.',
+        'This often happens when Cursor follow-up runs fail silently.',
+        `Send the same question again, or use <code>${MASTER_SPLINTER_CMD} new &lt;message&gt;</code> for a fresh session.`,
+        detail ? `\n<i>${escapeHtml(detail)}</i>` : '',
+      ].join('\n');
+    } else {
+      body = `My student, the run ended with status: ${run.status}.`;
+    }
   }
 
   return body;
@@ -88,6 +97,7 @@ export async function deliverRunReply(
   chatId: number,
   run: CursorRun,
   messageThreadId?: number,
+  streamError?: string,
 ): Promise<void> {
   const opts = messageThreadId ? { messageThreadId, parseMode: 'HTML' as const } : { parseMode: 'HTML' as const };
   if (!isTerminalRunStatus(run.status)) {
@@ -104,19 +114,29 @@ export async function deliverRunReply(
   }
 
   if (run.status !== 'FINISHED') {
-    const body = markdownToTelegramHtml(formatRunForTelegram(run));
+    const formatted = formatRunForTelegram(run, streamError);
+    const isEmptyError =
+      normalizeRunStatus(run.status) === 'ERROR' && !run.result?.trim();
+    const body = isEmptyError ? formatted : markdownToTelegramHtml(formatted);
+    const showStatusBanner =
+      normalizeRunStatus(run.status) !== 'ERROR' || Boolean(run.result?.trim());
     try {
       await sendMessage(
         env,
         chatId,
-        `<i>${escapeHtml(run.status)}</i>\n\n${body}`,
+        showStatusBanner ? `<i>${escapeHtml(run.status)}</i>\n\n${body}` : body,
         opts,
       );
     } catch {
-      await sendMessage(env, chatId, formatRunForTelegram(run), messageThreadId ? { messageThreadId } : {});
+      await sendMessage(
+        env,
+        chatId,
+        formatRunForTelegram(run, streamError),
+        messageThreadId ? { messageThreadId } : {},
+      );
     }
     return;
   }
 
-  await sendSplinterReply(env, chatId, formatRunForTelegram(run), messageThreadId);
+  await sendSplinterReply(env, chatId, formatRunForTelegram(run, streamError), messageThreadId);
 }

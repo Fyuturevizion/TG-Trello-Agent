@@ -55,7 +55,10 @@ export class SplinterPresence {
     private readonly env: Env,
     private readonly chatId: number,
     private readonly messageThreadId?: number,
-  ) {}
+    existingMessageId?: number,
+  ) {
+    if (existingMessageId) this.messageId = existingMessageId;
+  }
 
   private rotateQuote(): void {
     this.meditation = nextMeditationQuote(this.meditation);
@@ -77,13 +80,36 @@ export class SplinterPresence {
 
   async start(): Promise<void> {
     await sendChatAction(this.env, this.chatId, 'typing', this.messageThreadId);
-    const msg = await sendMessage(
-      this.env,
-      this.chatId,
-      formatPresence(0, this.state, this.meditation),
-      { parseMode: 'HTML', messageThreadId: this.messageThreadId },
-    );
-    this.messageId = msg.message_id;
+    if (!this.messageId) {
+      const msg = await sendMessage(
+        this.env,
+        this.chatId,
+        formatPresence(0, this.state, this.meditation),
+        { parseMode: 'HTML', messageThreadId: this.messageThreadId },
+      );
+      this.messageId = msg.message_id;
+    } else {
+      try {
+        await editMessageText(
+          this.env,
+          this.chatId,
+          this.messageId,
+          formatPresence(0, this.state, this.meditation),
+          undefined,
+          'HTML',
+          this.messageThreadId,
+        );
+      } catch {
+        // presence line missing — post a new one
+        const msg = await sendMessage(
+          this.env,
+          this.chatId,
+          formatPresence(0, this.state, this.meditation),
+          { parseMode: 'HTML', messageThreadId: this.messageThreadId },
+        );
+        this.messageId = msg.message_id;
+      }
+    }
 
     this.typingTimer = setInterval(() => {
       if (!this.stopped) {

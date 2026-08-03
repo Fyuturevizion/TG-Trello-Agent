@@ -32,7 +32,7 @@ export async function streamPresenceWhileRunning(
   let streamedText = '';
 
   const tryDeliver = async (): Promise<boolean> => {
-    const delivered = await deliverPendingIfReady(env, agentId, runId);
+    const delivered = await deliverPendingIfReady(env, agentId, runId, executionCtx);
     if (delivered) {
       await presence.finish();
     }
@@ -56,6 +56,9 @@ export async function streamPresenceWhileRunning(
         if (terminalStreamStatus(event.status)) {
           await tryDeliver();
         }
+      } else if (event.type === 'error') {
+        await patchPendingSplinterRun(env, { streamError: event.message });
+        presence.pushStream({ runStatus: 'ERROR' });
       } else if (event.type === 'result') {
         streamedText = event.text?.trim() ?? '';
         if (streamedText) {

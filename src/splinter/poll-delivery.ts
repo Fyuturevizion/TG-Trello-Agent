@@ -7,6 +7,7 @@ import {
   type PendingSplinterRun,
 } from './pending-run';
 import { deliverRunReply } from './relay';
+import { isFastEmptyCursorError, retryPendingWithFreshAgent } from './retry-run';
 import { cancelRun, getRun, isTerminalRunStatus } from '../cursor-api';
 import { sendMessage } from '../telegram';
 import type { Env } from '../types';
@@ -56,6 +57,7 @@ export async function deliverPendingIfReady(
   env: Env,
   agentId?: string,
   runId?: string,
+  executionCtx?: WaitUntilContext,
 ): Promise<boolean> {
   const pending = await loadPendingSplinterRun(env);
   if (!pending) return false;
@@ -71,7 +73,19 @@ export async function deliverPendingIfReady(
         ? { ...run, result: pending.streamedText }
         : run;
 
-    await deliverRunReply(env, pending.chatId, merged, pending.messageThreadId);
+    if (isFastEmptyCursorError(merged)) {
+      const retried = await retryPendingWithFreshAgent(env, pending, executionCtx);
+      if (retried) {
+        if (executionCtx) {
+          kickSplinterPollChain(env, executionCtx);
+        } else {
+          firePollRequest(env);
+        }
+        return false;
+      }
+    }
+
+    await deliverRunReply(env, pending.chatId, merged, pending.messageThreadId, pending.streamError);
     await markRunDelivered(env, pending.runId);
     await dismissPendingPresence(env, pending);
     await clearPendingSplinterRun(env);

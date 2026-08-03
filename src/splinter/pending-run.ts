@@ -15,6 +15,14 @@ export interface PendingSplinterRun {
   presenceMessageId?: number;
   /** Streamed result text if Cursor API result lags behind SSE. */
   streamedText?: string;
+  /** Full Cursor prompt for auto-retry when follow-up runs fail instantly. */
+  promptText?: string;
+  /** Short label for Cursor agent naming / session bookkeeping. */
+  runLabel?: string;
+  /** True after we already retried this prompt on a fresh cloud agent. */
+  autoRetried?: boolean;
+  /** SSE error event message when Cursor provides one. */
+  streamError?: string;
 }
 
 export async function savePendingSplinterRun(

@@ -196,6 +196,8 @@ async function runMasterSplinterPrompt(
       messageThreadId: target.messageThreadId,
       createdAt: new Date().toISOString(),
       presenceMessageId: presence.getMessageId(),
+      promptText,
+      runLabel: userPrompt.slice(0, 80),
     });
     kickSplinterPollChain(env, executionCtx);
     executionCtx.waitUntil(
