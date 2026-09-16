@@ -8,7 +8,7 @@ import type { Env, ReportType } from './types';
 import { REPORT_TYPE_LABELS } from './types';
 import { resolveBotUsername } from './bot-identity';
 import { loadActiveProduct } from './product/session';
-import { parseQaChatIds, primaryQaChatId } from './qa-chats';
+import { listQaChatIds, primaryQaChatId } from './qa-chats';
 
 export async function announceNewCard(
   env: Env,
@@ -24,7 +24,7 @@ export async function announceNewCard(
     reporterFirstName?: string;
   },
 ): Promise<void> {
-  const chatIds = parseQaChatIds(env);
+  const chatIds = await listQaChatIds(env);
   if (chatIds.length === 0) return;
 
   const mention = formatReporterMention(input);
@@ -90,7 +90,7 @@ export async function announceTrelloEvent(
   env: Env,
   lines: string[],
 ): Promise<void> {
-  const chatIds = parseQaChatIds(env);
+  const chatIds = await listQaChatIds(env);
   if (chatIds.length === 0) return;
 
   const text = lines.join('\n');
