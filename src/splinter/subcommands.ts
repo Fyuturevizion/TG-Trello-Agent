@@ -17,7 +17,9 @@ import { loadPendingSplinterRun } from './pending-run';
 import { deliverRunReply, prepareSplinterReplyText } from './relay';
 import { MASTER_SPLINTER_CMD } from './command';
 import { escapeHtml, markdownToTelegramHtml } from '../telegram-format';
-import { sendMessage } from '../telegram';
+import { postChannelTriggersToChat } from '../channel';
+import { addExtraQaChatId } from '../qa-chats';
+import { deleteMessage, sendMessage } from '../telegram';
 import type { Env } from '../types';
 
 function threadOpts(messageThreadId?: number) {
@@ -251,6 +253,70 @@ export async function handleMasterSplinterConfig(
     parseMode: 'HTML',
     ...opts,
   });
+}
+
+/** Best-effort delete of recent messages in this chat (bot needs delete permission). */
+export async function handleMasterSplinterPurgeChannel(
+  env: Env,
+  chatId: number,
+  scanCountRaw: string | undefined,
+  messageThreadId?: number,
+): Promise<void> {
+  const opts = threadOpts(messageThreadId);
+  const scanCount = Math.min(Math.max(Number(scanCountRaw ?? '600') || 600, 50), 3000);
+
+  const anchor = await sendMessage(env, chatId, '…', opts);
+  let deleted = 0;
+  for (let id = anchor.message_id; id > anchor.message_id - scanCount; id--) {
+    try {
+      await deleteMessage(env, chatId, id, messageThreadId);
+      deleted++;
+    } catch {
+      // message missing or too old
+    }
+  }
+
+  await sendMessage(
+    env,
+    chatId,
+    `Cleared ${deleted} recent messages in this thread, my student. The dojo breathes again.`,
+    opts,
+  );
+}
+
+export async function handleMasterSplinterAllowQa(
+  env: Env,
+  chatId: number,
+  chatType: string,
+  messageThreadId?: number,
+): Promise<void> {
+  const opts = threadOpts(messageThreadId);
+  const allowedTypes = new Set(['group', 'supergroup', 'channel']);
+  if (!allowedTypes.has(chatType)) {
+    await sendMessage(
+      env,
+      chatId,
+      'Run this from the QA group or channel you want to register, not in a private chat.',
+      opts,
+    );
+    return;
+  }
+
+  const ids = await addExtraQaChatId(env, chatId);
+  await postChannelTriggersToChat(env, chatId);
+
+  await sendMessage(
+    env,
+    chatId,
+    [
+      'This chat is now on the QA allowlist.',
+      `Chat ID: <code>${chatId}</code>`,
+      `Registered channels: ${ids.length}`,
+      '',
+      'Pinned triage buttons are refreshed. Reporters can use /report here again.',
+    ].join('\n'),
+    { parseMode: 'HTML', ...opts },
+  );
 }
 
 export async function ensureRepoConfigured(

@@ -1,4 +1,5 @@
-import { isQaChat, isDojoChat, parseAllowedChatIds } from './qa-chats';
+import { parseAllowedChatIdsAsync } from './qa-chats';
+import { isReporterAllowed } from './reporter-access';
 import type { Env } from './types';
 
 const TELEGRAM_API = 'https://api.telegram.org';
@@ -109,6 +110,40 @@ export async function deleteMessage(
   });
 }
 
+export type ChatMemberStatus =
+  | 'creator'
+  | 'administrator'
+  | 'member'
+  | 'restricted'
+  | 'left'
+  | 'kicked';
+
+export async function getChatMember(
+  env: Env,
+  chatId: number,
+  userId: number,
+): Promise<{ status: ChatMemberStatus; user?: { id: number } }> {
+  return telegramRequest(env, 'getChatMember', {
+    chat_id: chatId,
+    user_id: userId,
+  });
+}
+
+export async function sendPhoto(
+  env: Env,
+  chatId: number,
+  photoUrl: string,
+  options?: { caption?: string; parseMode?: 'HTML'; messageThreadId?: number },
+): Promise<{ message_id: number }> {
+  return telegramRequest(env, 'sendPhoto', {
+    chat_id: chatId,
+    photo: photoUrl,
+    caption: options?.caption,
+    parse_mode: options?.parseMode,
+    message_thread_id: options?.messageThreadId,
+  });
+}
+
 export function inlineKeyboard(rows: Array<Array<InlineButton>>): InlineKeyboard {
   return { inline_keyboard: rows };
 }
@@ -153,9 +188,13 @@ export async function setWebhook(env: Env, webhookUrl: string): Promise<void> {
   });
 }
 
-export function isAllowedChat(env: Env, chatId: number, chatType?: string): boolean {
-  const ids = parseAllowedChatIds(env);
-  if (ids.length > 0) return isQaChat(env, chatId) || isDojoChat(env, chatId);
+export async function isAllowedChat(
+  env: Env,
+  chatId: number,
+  chatType?: string,
+): Promise<boolean> {
+  const ids = await parseAllowedChatIdsAsync(env);
+  if (ids.length > 0) return ids.includes(chatId);
   // Fallback if unset: any group/supergroup/channel the bot is in
   return chatType === 'group' || chatType === 'supergroup' || chatType === 'channel';
 }
@@ -184,9 +223,7 @@ export function isBlockedUser(env: Env, userId: number, username?: string): bool
   return false;
 }
 
-/** Who may use /report, /help, etc. When unset, any member of the QA channel may. */
-export function isAllowedUser(env: Env, userId: number): boolean {
-  const ids = parseUserIdList(env.TELEGRAM_ALLOWED_USER_IDS);
-  if (ids.length === 0) return true;
-  return ids.includes(String(userId));
+/** Who may use /report and submit via the Mini App. See reporter-access.ts. */
+export async function isAllowedUser(env: Env, userId: number): Promise<boolean> {
+  return isReporterAllowed(env, userId);
 }

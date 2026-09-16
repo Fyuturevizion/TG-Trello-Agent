@@ -22,9 +22,12 @@ import {
   handleMasterSplinterCancel,
   handleMasterSplinterConfig,
   handleMasterSplinterLink,
+  handleMasterSplinterPurgeChannel,
   handleMasterSplinterReset,
+  handleMasterSplinterAllowQa,
   handleMasterSplinterStatus,
 } from './subcommands';
+import { grantReportersFromList } from '../reporter-access';
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText, messageThreadId } from '../telegram-message';
@@ -57,9 +60,28 @@ async function runMasterSplinterPrompt(
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
+  chatType?: string,
 ): Promise<void> {
   const chatId = target.chatId;
   const opts = threadOpts(target);
+
+  if (rest === 'allow-qa' || rest === 'allow qa') {
+    await handleMasterSplinterAllowQa(env, chatId, chatType ?? 'private', target.messageThreadId);
+    return;
+  }
+
+  if (rest.startsWith('add-reporter ') || rest.startsWith('add reporter ')) {
+    const list = rest.replace(/^add[- ]reporter\s+/i, '').trim();
+    await grantReportersFromList(env, chatId, list);
+    return;
+  }
+
+  if (rest === 'purge-channel' || rest.startsWith('purge-channel ')) {
+    const count = rest.replace(/^purge-channel\s*/i, '').trim() || undefined;
+    await handleMasterSplinterPurgeChannel(env, chatId, count, target.messageThreadId);
+    return;
+  }
+
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
       env,
@@ -253,7 +275,7 @@ export async function handleMasterSplinterCommand(
 
   const rest = invocation.rest;
 
-  if (!(await isAdminUser(env, userId))) {
+  if (!(await isAdminUser(env, userId, message.from?.username))) {
     const record = await recordIntruderAttempt(env, userId, 'command');
     await sendMessage(
       env,
@@ -270,6 +292,7 @@ export async function handleMasterSplinterCommand(
     rest,
     executionCtx,
     userId,
+    message.chat.type,
   );
   return true;
 }
@@ -281,7 +304,7 @@ export async function handleAdminSplinterChat(
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
 ): Promise<boolean> {
   const userId = message.from?.id;
-  if (!userId || !(await isAdminUser(env, userId))) return false;
+  if (!userId || !(await isAdminUser(env, userId, message.from?.username))) return false;
   if (!isAdminSplinterPing(message, env)) return false;
 
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));
@@ -291,6 +314,7 @@ export async function handleAdminSplinterChat(
     rest,
     executionCtx,
     userId,
+    message.chat.type,
   );
   return true;
 }
