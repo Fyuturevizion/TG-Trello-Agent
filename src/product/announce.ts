@@ -1,13 +1,13 @@
 import { escapeHtml, formatBoardLine, formatTrelloUrlLink } from '../telegram-format';
 import { sendMessage } from '../telegram';
-import { parseQaChatIds } from '../qa-chats';
+import { loadQaChatIds } from '../qa-chats';
 import type { Env } from '../types';
 
 export async function announceProductOpened(
   env: Env,
   input: { displayName: string; shortUrl: string },
 ): Promise<void> {
-  const chatIds = parseQaChatIds(env);
+  const chatIds = await loadQaChatIds(env);
   if (chatIds.length === 0) return;
 
   const link = formatTrelloUrlLink(input.shortUrl);
@@ -26,7 +26,7 @@ export async function announceProductOpened(
 }
 
 export async function announceProductClosed(env: Env, displayName: string): Promise<void> {
-  const chatIds = parseQaChatIds(env);
+  const chatIds = await loadQaChatIds(env);
   if (chatIds.length === 0) return;
 
   const text = [
@@ -52,7 +52,7 @@ export async function announceProductFeedback(
     reporterFirstName?: string;
   },
 ): Promise<void> {
-  const chatIds = parseQaChatIds(env);
+  const chatIds = await loadQaChatIds(env);
   if (chatIds.length === 0) return;
 
   const who = input.reporterUsername

@@ -26,6 +26,8 @@ import {
   handleMasterSplinterStatus,
 } from './subcommands';
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
+import { addQaChatId } from '../qa-chats';
+import { isAllowQaChannelRequest } from './qa-channel';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText, messageThreadId } from '../telegram-message';
 import { escapeHtml } from '../telegram-format';
@@ -51,15 +53,64 @@ function threadOpts(target: ReplyTarget) {
   return target.messageThreadId ? { messageThreadId: target.messageThreadId } : {};
 }
 
+async function handleAllowQaChannel(
+  env: Env,
+  chatId: number,
+  chatType: string,
+  messageThreadId?: number,
+): Promise<void> {
+  const opts = messageThreadId ? { messageThreadId } : {};
+  if (chatType === 'private') {
+    await sendMessage(
+      env,
+      chatId,
+      [
+        'My student, I cannot enroll a channel from our private chat.',
+        'Add me to the QA group or channel first, then run <code>/master-splinter allow-qa</code> there.',
+      ].join('\n'),
+      { parseMode: 'HTML', ...opts },
+    );
+    return;
+  }
+
+  const result = await addQaChatId(env, chatId);
+  if (result.added) {
+    await sendMessage(
+      env,
+      chatId,
+      [
+        `This chat (<code>${chatId}</code>) is now on the QA allowlist, apprentice.`,
+        'Trello card updates and triage announcements will post here.',
+        'Run <code>/setup</code> here if you want fresh pinned report buttons.',
+      ].join('\n'),
+      { parseMode: 'HTML', ...opts },
+    );
+    return;
+  }
+
+  await sendMessage(
+    env,
+    chatId,
+    `This chat (<code>${chatId}</code>) was already registered for QA updates.`,
+    { parseMode: 'HTML', ...opts },
+  );
+}
+
 async function runMasterSplinterPrompt(
   env: Env,
   target: ReplyTarget,
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
+  chatType?: string,
 ): Promise<void> {
   const chatId = target.chatId;
   const opts = threadOpts(target);
+  if (isAllowQaChannelRequest(rest)) {
+    await handleAllowQaChannel(env, chatId, chatType ?? 'private', target.messageThreadId);
+    return;
+  }
+
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
       env,
@@ -270,6 +321,7 @@ export async function handleMasterSplinterCommand(
     rest,
     executionCtx,
     userId,
+    message.chat.type,
   );
   return true;
 }
@@ -291,6 +343,7 @@ export async function handleAdminSplinterChat(
     rest,
     executionCtx,
     userId,
+    message.chat.type,
   );
   return true;
 }

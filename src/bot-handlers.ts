@@ -1,7 +1,7 @@
 import { channelTriggerKeyboard } from './channel';
 import { findCommandInText } from './commands/registry';
 import { handleProductMessage } from './product/handlers';
-import { primaryQaChatId } from './qa-chats';
+import { primaryQaChatIdAsync } from './qa-chats';
 import { clearSession } from './session';
 import { isAdminUser, normalizeCommand, pinChatMessage, sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
@@ -19,7 +19,7 @@ export async function sendOpenAppPrompt(
 }
 
 export async function postChannelTriggers(env: Env): Promise<void> {
-  const chatId = primaryQaChatId(env);
+  const chatId = await primaryQaChatIdAsync(env);
   if (chatId === null) {
     throw new Error('TELEGRAM_QA_CHAT_ID is not set');
   }
