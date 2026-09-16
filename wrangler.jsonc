@@ -38,7 +38,9 @@
     // Growth Hub - Dojo forum supergroup (always allowed for triage + Splinter)
     "TELEGRAM_DOJO_CHAT_ID": "-1004465145918",
     // Only this Telegram user may promote admins via /dojo_grant + secret word
-    "TELEGRAM_DOJO_KEEPER_ID": "453758488"
+    "TELEGRAM_DOJO_KEEPER_ID": "453758488",
+    // Fixed admins by @username (/setup, /master-splinter)
+    "TELEGRAM_ADMIN_USERNAMES": "Connor13all"
   },
   "triggers": {
     "crons": ["* * * * *", "0 8 * * *"]

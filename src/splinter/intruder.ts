@@ -147,7 +147,7 @@ export async function handleUnauthorizedSplinterSummon(
   message: TelegramMessage,
 ): Promise<boolean> {
   const userId = message.from?.id;
-  if (!userId || (await isAdminUser(env, userId))) return false;
+  if (!userId || (await isAdminUser(env, userId, message.from?.username))) return false;
 
   const kind = detectUnauthorizedSplinterSummon(message, env);
   if (!kind) return false;

@@ -253,7 +253,7 @@ export async function handleMasterSplinterCommand(
 
   const rest = invocation.rest;
 
-  if (!(await isAdminUser(env, userId))) {
+  if (!(await isAdminUser(env, userId, message.from?.username))) {
     const record = await recordIntruderAttempt(env, userId, 'command');
     await sendMessage(
       env,
@@ -281,7 +281,7 @@ export async function handleAdminSplinterChat(
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
 ): Promise<boolean> {
   const userId = message.from?.id;
-  if (!userId || !(await isAdminUser(env, userId))) return false;
+  if (!userId || !(await isAdminUser(env, userId, message.from?.username))) return false;
   if (!isAdminSplinterPing(message, env)) return false;
 
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));

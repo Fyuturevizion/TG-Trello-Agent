@@ -22,6 +22,8 @@ export interface Env {
   TELEGRAM_BLOCKED_USERNAMES?: string;
   /** Comma-separated IDs allowed to run admin commands (/setup, /master-splinter). */
   TELEGRAM_ADMIN_USER_IDS?: string;
+  /** Comma-separated @usernames (no @) for fixed admins when IDs are inconvenient. */
+  TELEGRAM_ADMIN_USERNAMES?: string;
   /** Secret word for /dojo_grant (Worker secret DOJO_ADMIN_SECRET). */
   DOJO_ADMIN_SECRET?: string;
   TRELLO_API_KEY: string;
