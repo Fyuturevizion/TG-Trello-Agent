@@ -1,3 +1,4 @@
+import { isQaChannelMemberWithFullAccess } from './qa-membership';
 import { sendMessage } from './telegram';
 import type { Env, TelegramMessage } from './types';
 
@@ -16,6 +17,14 @@ export const DOJO_ADMIN_SECRET_PLACEHOLDER = 'ratking-pizza-decree';
 function parseUserIdList(raw: string | undefined): string[] {
   if (!raw?.trim()) return [];
   return raw.split(',').map((id) => id.trim()).filter(Boolean);
+}
+
+function parseUsernameList(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(',')
+    .map((name) => name.trim().replace(/^@/, '').toLowerCase())
+    .filter(Boolean);
 }
 
 /** The one keeper who may grant admin with the secret word. */
@@ -44,15 +53,24 @@ async function saveGrantedAdminIds(env: Env, ids: string[]): Promise<void> {
   });
 }
 
-/** Admin = dojo keeper, TELEGRAM_ADMIN_USER_IDS, or keeper-granted IDs only. */
-export async function isAdminUser(env: Env, userId: number): Promise<boolean> {
+/** Admin = keeper, TELEGRAM_ADMIN_USER_IDS / TELEGRAM_ADMIN_USERNAMES, or keeper-granted IDs. */
+export async function isAdminUser(
+  env: Env,
+  userId: number,
+  username?: string,
+): Promise<boolean> {
   if (isDojoKeeper(env, userId)) return true;
 
   const staticAdmins = parseUserIdList(env.TELEGRAM_ADMIN_USER_IDS);
   if (staticAdmins.includes(String(userId))) return true;
 
+  const staticAdminNames = parseUsernameList(env.TELEGRAM_ADMIN_USERNAMES);
+  if (username && staticAdminNames.includes(username.toLowerCase())) return true;
+
   const granted = await loadGrantedAdminIds(env);
-  return granted.includes(String(userId));
+  if (granted.includes(String(userId))) return true;
+
+  return isQaChannelMemberWithFullAccess(env, userId);
 }
 
 function secretMatches(env: Env, provided: string): boolean {

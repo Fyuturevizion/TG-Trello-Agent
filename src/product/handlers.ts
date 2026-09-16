@@ -26,7 +26,7 @@ export async function handleProductMessage(env: Env, message: TelegramMessage): 
   if (!userId) return true;
 
   const args = productArgs(text);
-  const isAdmin = await isAdminUser(env, userId);
+  const isAdmin = await isAdminUser(env, userId, message.from?.username);
 
   if (!args) {
     const active = await loadActiveProduct(env);

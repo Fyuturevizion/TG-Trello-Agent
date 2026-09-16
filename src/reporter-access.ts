@@ -1,3 +1,4 @@
+import { isQaChannelMemberWithFullAccess } from './qa-membership';
 import { sendMessage } from './telegram';
 import type { Env } from './types';
 
@@ -40,7 +41,8 @@ export async function isReporterAllowed(env: Env, userId: number): Promise<boole
   const granted = await loadGrantedReporterIds(env);
   if (staticIds.length === 0 && granted.length === 0) return true;
   const id = String(userId);
-  return staticIds.includes(id) || granted.includes(id);
+  if (staticIds.includes(id) || granted.includes(id)) return true;
+  return isQaChannelMemberWithFullAccess(env, userId);
 }
 
 export async function grantReporter(

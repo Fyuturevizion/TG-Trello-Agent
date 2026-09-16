@@ -110,6 +110,40 @@ export async function deleteMessage(
   });
 }
 
+export type ChatMemberStatus =
+  | 'creator'
+  | 'administrator'
+  | 'member'
+  | 'restricted'
+  | 'left'
+  | 'kicked';
+
+export async function getChatMember(
+  env: Env,
+  chatId: number,
+  userId: number,
+): Promise<{ status: ChatMemberStatus; user?: { id: number } }> {
+  return telegramRequest(env, 'getChatMember', {
+    chat_id: chatId,
+    user_id: userId,
+  });
+}
+
+export async function sendPhoto(
+  env: Env,
+  chatId: number,
+  photoUrl: string,
+  options?: { caption?: string; parseMode?: 'HTML'; messageThreadId?: number },
+): Promise<{ message_id: number }> {
+  return telegramRequest(env, 'sendPhoto', {
+    chat_id: chatId,
+    photo: photoUrl,
+    caption: options?.caption,
+    parse_mode: options?.parseMode,
+    message_thread_id: options?.messageThreadId,
+  });
+}
+
 export function inlineKeyboard(rows: Array<Array<InlineButton>>): InlineKeyboard {
   return { inline_keyboard: rows };
 }
