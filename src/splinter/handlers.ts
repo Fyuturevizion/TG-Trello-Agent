@@ -32,7 +32,7 @@ import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText, messageThreadId } from '../telegram-message';
 import { escapeHtml } from '../telegram-format';
-import { isAdminUser, sendMessage } from '../telegram';
+import { isAdminUser, sendMessage, sendPhoto } from '../telegram';
 import type { Env, TelegramMessage } from '../types';
 
 function buildPrompt(config: AgentConfig, userPrompt: string, isFollowUp: boolean): string {
@@ -79,6 +79,19 @@ async function runMasterSplinterPrompt(
   if (rest === 'purge-channel' || rest.startsWith('purge-channel ')) {
     const count = rest.replace(/^purge-channel\s*/i, '').trim() || undefined;
     await handleMasterSplinterPurgeChannel(env, chatId, count, target.messageThreadId);
+    return;
+  }
+
+  if (rest === 'jumping-knees' || rest === 'jumping knees') {
+    const base = env.WEBAPP_URL?.replace(/\/$/, '') ?? '';
+    if (!base) {
+      await sendMessage(env, chatId, 'WEBAPP_URL is not set on the Worker.', opts);
+      return;
+    }
+    await sendPhoto(env, chatId, `${base}/splinter-jumping-knees.png`, {
+      caption: 'Five minutes of jumping knees, as promised. The legs remember what the mind forgets.',
+      messageThreadId: target.messageThreadId,
+    });
     return;
   }
 
