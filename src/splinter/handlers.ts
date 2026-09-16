@@ -23,8 +23,10 @@ import {
   handleMasterSplinterConfig,
   handleMasterSplinterLink,
   handleMasterSplinterReset,
+  handleMasterSplinterAllowQa,
   handleMasterSplinterStatus,
 } from './subcommands';
+import { grantReportersFromList } from '../reporter-access';
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText, messageThreadId } from '../telegram-message';
@@ -57,9 +59,22 @@ async function runMasterSplinterPrompt(
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
+  chatType?: string,
 ): Promise<void> {
   const chatId = target.chatId;
   const opts = threadOpts(target);
+
+  if (rest === 'allow-qa' || rest === 'allow qa') {
+    await handleMasterSplinterAllowQa(env, chatId, chatType ?? 'private', target.messageThreadId);
+    return;
+  }
+
+  if (rest.startsWith('add-reporter ') || rest.startsWith('add reporter ')) {
+    const list = rest.replace(/^add[- ]reporter\s+/i, '').trim();
+    await grantReportersFromList(env, chatId, list);
+    return;
+  }
+
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
       env,
@@ -270,6 +285,7 @@ export async function handleMasterSplinterCommand(
     rest,
     executionCtx,
     userId,
+    message.chat.type,
   );
   return true;
 }
@@ -291,6 +307,7 @@ export async function handleAdminSplinterChat(
     rest,
     executionCtx,
     userId,
+    message.chat.type,
   );
   return true;
 }
