@@ -17,6 +17,8 @@ import { loadPendingSplinterRun } from './pending-run';
 import { deliverRunReply, prepareSplinterReplyText } from './relay';
 import { MASTER_SPLINTER_CMD } from './command';
 import { escapeHtml, markdownToTelegramHtml } from '../telegram-format';
+import { postChannelTriggersToChat } from '../channel';
+import { addExtraQaChatId } from '../qa-chats';
 import { sendMessage } from '../telegram';
 import type { Env } from '../types';
 
@@ -251,6 +253,41 @@ export async function handleMasterSplinterConfig(
     parseMode: 'HTML',
     ...opts,
   });
+}
+
+export async function handleMasterSplinterAllowQa(
+  env: Env,
+  chatId: number,
+  chatType: string,
+  messageThreadId?: number,
+): Promise<void> {
+  const opts = threadOpts(messageThreadId);
+  const allowedTypes = new Set(['group', 'supergroup', 'channel']);
+  if (!allowedTypes.has(chatType)) {
+    await sendMessage(
+      env,
+      chatId,
+      'Run this from the QA group or channel you want to register, not in a private chat.',
+      opts,
+    );
+    return;
+  }
+
+  const ids = await addExtraQaChatId(env, chatId);
+  await postChannelTriggersToChat(env, chatId);
+
+  await sendMessage(
+    env,
+    chatId,
+    [
+      'This chat is now on the QA allowlist.',
+      `Chat ID: <code>${chatId}</code>`,
+      `Registered channels: ${ids.length}`,
+      '',
+      'Pinned triage buttons are refreshed. Reporters can use /report here again.',
+    ].join('\n'),
+    { parseMode: 'HTML', ...opts },
+  );
 }
 
 export async function ensureRepoConfigured(

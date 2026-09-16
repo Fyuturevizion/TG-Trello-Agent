@@ -4,13 +4,13 @@ import { saveCardReporter } from '../card-reporter';
 import { announceNewCard, notifyReporterDm } from '../channel';
 import type { DeviceKey } from '../devices';
 import { deviceNeedsAppVersion, isDeviceKey } from '../devices';
-import { primaryQaChatId } from '../qa-chats';
+import { primaryQaChatIdAsync } from '../qa-chats';
 import {
   formatBoardLine,
   formatCardUpdateMessage,
   formatReporterMention,
 } from '../telegram-format';
-import { isBlockedUser } from '../telegram';
+import { isAllowedUser, isBlockedUser } from '../telegram';
 import { validateInitData } from '../telegram-webapp';
 import { addAttachment, createCard } from '../trello';
 import type { Env, ReportType } from '../types';
@@ -101,10 +101,14 @@ export async function handleReportSubmit(
     return { ok: false, error: 'Not permitted', status: 403 };
   }
 
+  if (!(await isAllowedUser(env, auth.user.id))) {
+    return { ok: false, error: 'Reporter access not granted', status: 403 };
+  }
+
   const maxPhotos = Math.min(Number(env.MAX_PHOTOS ?? '3') || 3, 10);
   const photos = (body.photos ?? []).slice(0, maxPhotos);
 
-  const qaChatId = primaryQaChatId(env) ?? auth.user.id;
+  const qaChatId = (await primaryQaChatIdAsync(env)) ?? auth.user.id;
   const device = body.device as DeviceKey;
   const browser = body.browser as BrowserKey | undefined;
 

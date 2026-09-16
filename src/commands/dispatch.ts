@@ -2,7 +2,7 @@ import { DOJO_GRANT_CMD, handleDojoGrantCommand } from '../dojo-access';
 import { handleAdminSplinterChat, handleMasterSplinterCommand } from '../splinter/handlers';
 import { handleUnauthorizedSplinterSummon } from '../splinter/intruder';
 import { handleBotMessage } from '../bot-handlers';
-import { isAdminUser, isAllowedChat, isBlockedUser, sendMessage } from '../telegram';
+import { isAdminUser, isAllowedChat, isAllowedUser, isBlockedUser, sendMessage } from '../telegram';
 import { commandToken, isReporterCommand, isUtilityCommand } from './registry';
 import { resolveBotUsername } from '../bot-identity';
 import { sendThreadOptions } from '../telegram-message';
@@ -66,7 +66,7 @@ export async function dispatchTelegramMessage(
 
   if (await handleAdminSplinterChat(env, message, executionCtx)) return;
 
-  const inQaChannel = isAllowedChat(env, message.chat.id, message.chat.type);
+  const inQaChannel = await isAllowedChat(env, message.chat.id, message.chat.type);
   const adminDm = message.chat.type === 'private' && (await isAdminUser(env, userId));
   if (!inQaChannel && !adminDm) {
     if (isReporterCommand(text)) {
@@ -96,6 +96,22 @@ export async function dispatchTelegramMessage(
       );
     }
     return;
+  }
+
+  if (!(await isAllowedUser(env, userId)) && !(await isAdminUser(env, userId))) {
+    if (isReporterCommand(text)) {
+      await sendMessage(
+        env,
+        message.chat.id,
+        [
+          'You are not on the reporter allowlist yet.',
+          'Ask the dojo admin to run <code>/master-splinter add-reporter</code> with your user ID.',
+          `Your ID: <code>${userId}</code> (or send /myid).`,
+        ].join('\n'),
+        { parseMode: 'HTML', ...sendThreadOptions(message) },
+      );
+      return;
+    }
   }
 
   // Triage commands (/report, /bug, …) always win over intruder teases in QA chat.
