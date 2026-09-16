@@ -25,6 +25,7 @@ import {
   handleMasterSplinterReset,
   handleMasterSplinterStatus,
 } from './subcommands';
+import { handleAllowQa, isAllowQaIntent } from './allow-qa';
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
 import { resolveBotUsername } from '../bot-identity';
 import { commandRoutingText, messageText, messageThreadId } from '../telegram-message';
@@ -57,9 +58,16 @@ async function runMasterSplinterPrompt(
   rest: string,
   executionCtx: { waitUntil: (p: Promise<unknown>) => void },
   userId?: number,
+  chatType?: string,
 ): Promise<void> {
   const chatId = target.chatId;
   const opts = threadOpts(target);
+
+  if (isAllowQaIntent(rest)) {
+    await handleAllowQa(env, chatId, chatType ?? 'private', target.messageThreadId);
+    return;
+  }
+
   if (!env.CURSOR_API_KEY?.trim()) {
     await sendMessage(
       env,
@@ -270,6 +278,7 @@ export async function handleMasterSplinterCommand(
     rest,
     executionCtx,
     userId,
+    message.chat.type,
   );
   return true;
 }
@@ -291,6 +300,7 @@ export async function handleAdminSplinterChat(
     rest,
     executionCtx,
     userId,
+    message.chat.type,
   );
   return true;
 }
