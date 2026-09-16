@@ -22,6 +22,7 @@ import {
   handleMasterSplinterCancel,
   handleMasterSplinterConfig,
   handleMasterSplinterLink,
+  handleMasterSplinterPurgeChannel,
   handleMasterSplinterReset,
   handleMasterSplinterAllowQa,
   handleMasterSplinterStatus,
@@ -72,6 +73,12 @@ async function runMasterSplinterPrompt(
   if (rest.startsWith('add-reporter ') || rest.startsWith('add reporter ')) {
     const list = rest.replace(/^add[- ]reporter\s+/i, '').trim();
     await grantReportersFromList(env, chatId, list);
+    return;
+  }
+
+  if (rest === 'purge-channel' || rest.startsWith('purge-channel ')) {
+    const count = rest.replace(/^purge-channel\s*/i, '').trim() || undefined;
+    await handleMasterSplinterPurgeChannel(env, chatId, count, target.messageThreadId);
     return;
   }
 
