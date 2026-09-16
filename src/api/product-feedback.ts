@@ -2,7 +2,7 @@ import { isProductAreaId, PRODUCT_AREAS, productAreaLabel } from '../product/are
 import { announceProductFeedback } from '../product/announce';
 import { checklistIdForArea, incrementProductFeedbackCount, loadActiveProduct } from '../product/session';
 import { addProductAttachment, appendProductFeedback } from '../product/trello';
-import { isBlockedUser } from '../telegram';
+import { isAllowedUser, isBlockedUser } from '../telegram';
 import { validateInitData } from '../telegram-webapp';
 import type { Env } from '../types';
 
@@ -91,6 +91,10 @@ export async function handleProductFeedbackSubmit(
 
   if (isBlockedUser(env, auth.user.id, auth.user.username)) {
     return { ok: false, error: 'Not permitted', status: 403 };
+  }
+
+  if (!(await isAllowedUser(env, auth.user.id))) {
+    return { ok: false, error: 'Reporter access not granted', status: 403 };
   }
 
   const campaign = await loadActiveProduct(env);
