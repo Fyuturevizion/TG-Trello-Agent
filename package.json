@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "tsx scripts/deploy.ts",
+    "sync:github-secret": "tsx scripts/sync-github-deploy-secret.ts",
     "check": "wrangler check",
     "types": "wrangler types",
     "typecheck": "tsc --noEmit",

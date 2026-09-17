@@ -45,7 +45,7 @@ jobs:
       - name: Deploy
         run: |
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "Missing CLOUDFLARE_API_TOKEN. Add it to .env in the repo, .dev.vars, or GitHub Actions secrets."
+            echo "Missing CLOUDFLARE_API_TOKEN. Add it to .env in the repo, .dev.vars, or GitHub Actions secrets (same value as local npm run deploy)."
             exit 1
           fi
           npx wrangler deploy
