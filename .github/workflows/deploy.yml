@@ -20,17 +20,7 @@ jobs:
 
       - run: npm run typecheck
 
-      - name: Load Cloudflare credentials from .env / .dev.vars
-        run: |
-          for f in .env .dev.vars; do
-            [ -f "$f" ] || continue
-            grep -E '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID)=' "$f" >> "$GITHUB_ENV" || true
-          done
-          if [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "CLOUDFLARE_ACCOUNT_ID=53d52ffd40feb5356ce596aadef30109" >> "$GITHUB_ENV"
-          fi
-
-      - name: Apply GitHub Actions secrets when configured
+      - name: Load Cloudflare credentials (GitHub secrets, then non-empty .env)
         env:
           SECRET_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SECRET_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -40,6 +30,28 @@ jobs:
           fi
           if [ -n "$SECRET_ACCOUNT" ]; then
             echo "CLOUDFLARE_ACCOUNT_ID=$SECRET_ACCOUNT" >> "$GITHUB_ENV"
+          fi
+          for f in .env .dev.vars; do
+            [ -f "$f" ] || continue
+            while IFS= read -r line; do
+              case "$line" in
+                CLOUDFLARE_API_TOKEN=*)
+                  val="${line#CLOUDFLARE_API_TOKEN=}"
+                  if [ -n "$val" ]; then
+                    echo "CLOUDFLARE_API_TOKEN=$val" >> "$GITHUB_ENV"
+                  fi
+                  ;;
+                CLOUDFLARE_ACCOUNT_ID=*)
+                  val="${line#CLOUDFLARE_ACCOUNT_ID=}"
+                  if [ -n "$val" ]; then
+                    echo "CLOUDFLARE_ACCOUNT_ID=$val" >> "$GITHUB_ENV"
+                  fi
+                  ;;
+              esac
+            done < <(grep -E '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID)=' "$f" || true)
+          done
+          if [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "CLOUDFLARE_ACCOUNT_ID=53d52ffd40feb5356ce596aadef30109" >> "$GITHUB_ENV"
           fi
 
       - name: Deploy
