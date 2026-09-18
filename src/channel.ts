@@ -9,6 +9,7 @@ import { REPORT_TYPE_LABELS } from './types';
 import { resolveBotUsername } from './bot-identity';
 import { loadActiveProduct } from './product/session';
 import { getAllQaChatIds, primaryQaChatIdAsync } from './qa-chats';
+import { buildReportStartAppParam } from './report-origin';
 import { qaDeliveryThreadId } from './qa-threads';
 
 export async function announceNewCard(
@@ -24,8 +25,9 @@ export async function announceNewCard(
     reporterId: number;
     reporterFirstName?: string;
   },
+  origin?: { chatId: number; messageThreadId?: number },
 ): Promise<void> {
-  const chatIds = await getAllQaChatIds(env);
+  const chatIds = origin ? [origin.chatId] : await getAllQaChatIds(env);
   if (chatIds.length === 0) return;
 
   const mention = formatReporterMention(input);
@@ -45,7 +47,10 @@ export async function announceNewCard(
   }).join('\n');
 
   for (const chatId of chatIds) {
-    const messageThreadId = await qaDeliveryThreadId(env, chatId);
+    const messageThreadId =
+      origin?.chatId === chatId && origin.messageThreadId
+        ? origin.messageThreadId
+        : await qaDeliveryThreadId(env, chatId);
     await sendMessage(env, chatId, text, {
       parseMode: 'HTML',
       ...(messageThreadId ? { messageThreadId } : {}),
@@ -128,7 +133,7 @@ export async function postChannelTriggersToChat(
       'Tap a button to open the report form. One message is posted here when a card is submitted.',
     ].join('\n'),
     {
-      replyMarkup: await channelTriggerKeyboard(env),
+      replyMarkup: await channelTriggerKeyboard(env, { chatId, messageThreadId: thread }),
       ...(thread ? { messageThreadId: thread } : {}),
     },
   );
@@ -153,22 +158,41 @@ export async function notifyReporterDm(
 }
 
 /** Opens via BotFather main Mini App (needs Configure Mini App URL + cache bust ?ui=). */
-export async function channelTriggerKeyboard(env: Env) {
-  return channelStartAppKeyboard(env);
+export async function channelTriggerKeyboard(
+  env: Env,
+  origin?: { chatId: number; messageThreadId?: number },
+) {
+  return channelStartAppKeyboard(env, origin);
 }
 
-export async function channelStartAppKeyboard(env: Env) {
+export async function channelStartAppKeyboard(
+  env: Env,
+  origin?: { chatId: number; messageThreadId?: number },
+) {
   const bot = resolveBotUsername(env);
+  const chatId = origin?.chatId;
+  const threadId = origin?.messageThreadId;
+  const bugParam = chatId
+    ? buildReportStartAppParam('bug', chatId, threadId)
+    : 'bug';
+  const wishParam = chatId
+    ? buildReportStartAppParam('wishlist', chatId, threadId)
+    : 'wishlist';
   const rows: Array<Array<{ text: string; url: string }>> = [
-    [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=bug` }],
-    [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=wishlist` }],
+    [{ text: 'Report bug', url: `https://t.me/${bot}?startapp=${encodeURIComponent(bugParam)}` }],
+    [{ text: 'Wishlist', url: `https://t.me/${bot}?startapp=${encodeURIComponent(wishParam)}` }],
   ];
 
   const active = await loadActiveProduct(env);
   if (active) {
-    // web_app buttons are private-chat only — QA channels need t.me startapp links.
+    const productParam = chatId
+      ? buildReportStartAppParam('product', chatId, threadId)
+      : 'product';
     rows.push([
-      { text: `${active.displayName} feedback`, url: `https://t.me/${bot}?startapp=product` },
+      {
+        text: `${active.displayName} feedback`,
+        url: `https://t.me/${bot}?startapp=${encodeURIComponent(productParam)}`,
+      },
     ]);
   }
 

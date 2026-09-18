@@ -69,9 +69,10 @@ async function main(): Promise<void> {
     inline_keyboard: [[{ text: `Open @${botUsername}`, url: `https://t.me/${botUsername}` }]],
   };
 
-  const reply_markup = hasMain ? channelStartAppKeyboard(workerEnv) : fallbackKeyboard;
-
   for (const chatId of chatIds) {
+    const reply_markup = hasMain
+      ? await channelStartAppKeyboard(workerEnv, { chatId })
+      : fallbackKeyboard;
     const sent = await api(token, 'sendMessage', {
       chat_id: chatId,
       text,

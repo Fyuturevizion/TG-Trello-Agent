@@ -1,4 +1,6 @@
 import { channelTriggerKeyboard, postChannelTriggersToChat } from './channel';
+import { messageThreadId, sendThreadOptions } from './telegram-message';
+import { setReportThreadId, TELEGRAM_GENERAL_TOPIC_ID } from './qa-threads';
 import { findCommandInText } from './commands/registry';
 import { handleProductMessage } from './product/handlers';
 import { addExtraQaChatId } from './qa-chats';
@@ -12,9 +14,12 @@ export async function sendOpenAppPrompt(
   env: Env,
   chatId: number,
   intro?: string,
+  threadId?: number,
 ): Promise<void> {
+  const origin = { chatId, messageThreadId: threadId };
   await sendMessage(env, chatId, intro ?? 'WLTH QA triage — open the form:', {
-    replyMarkup: await channelTriggerKeyboard(env),
+    replyMarkup: await channelTriggerKeyboard(env, origin),
+    ...(threadId ? { messageThreadId: threadId } : {}),
   });
 }
 
@@ -47,11 +52,16 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
       return true;
     }
     await addExtraQaChatId(env, chatId);
-    await postChannelTriggers(env, chatId);
+    const thread = messageThreadId(message);
+    if (thread && thread !== TELEGRAM_GENERAL_TOPIC_ID) {
+      await setReportThreadId(env, chatId, thread);
+    }
+    await postChannelTriggersToChat(env, chatId, thread);
     await sendMessage(
       env,
       chatId,
       'Posted (and pinned if bot is admin) channel trigger buttons. This chat is registered for QA triage.',
+      thread ? { messageThreadId: thread } : {},
     );
     return true;
   }
@@ -71,7 +81,13 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
         '/myid — show your Telegram user ID',
         '/product — product feedback (when a round is open)',
       ].join('\n'),
-      { replyMarkup: await channelTriggerKeyboard(env) },
+      {
+        replyMarkup: await channelTriggerKeyboard(env, {
+          chatId,
+          messageThreadId: messageThreadId(message),
+        }),
+        ...sendThreadOptions(message),
+      },
     );
     return true;
   }
@@ -89,7 +105,7 @@ export async function handleBotMessage(env: Env, message: TelegramMessage): Prom
         : openCmd === '/wishlist'
           ? 'Wishlist — open the form:'
           : 'Open the triage form:';
-    await sendOpenAppPrompt(env, chatId, hint);
+    await sendOpenAppPrompt(env, chatId, hint, messageThreadId(message));
     return true;
   }
 
