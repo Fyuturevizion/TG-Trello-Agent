@@ -4,7 +4,9 @@ import { saveCardReporter } from '../card-reporter';
 import { announceNewCard, notifyReporterDm } from '../channel';
 import type { DeviceKey } from '../devices';
 import { deviceNeedsAppVersion, isDeviceKey } from '../devices';
-import { primaryQaChatIdAsync } from '../qa-chats';
+import { addExtraQaChatId, primaryQaChatIdAsync } from '../qa-chats';
+import { parseReportOriginBody } from '../report-origin';
+import { setReportThreadId } from '../qa-threads';
 import {
   formatBoardLine,
   formatCardUpdateMessage,
@@ -17,6 +19,8 @@ import type { Env, ReportType } from '../types';
 
 interface ReportBody {
   initData: string;
+  originChatId?: number;
+  originThreadId?: number;
   type: ReportType;
   device: string;
   browser?: string;
@@ -63,8 +67,19 @@ function parseBody(raw: unknown): ReportBody | null {
   const photos = Array.isArray(b.photos)
     ? b.photos.filter((p): p is string => typeof p === 'string')
     : [];
+
+  let originChatId: number | undefined;
+  let originThreadId: number | undefined;
+  const parsedOrigin = parseReportOriginBody(b);
+  if (parsedOrigin) {
+    originChatId = parsedOrigin.chatId;
+    originThreadId = parsedOrigin.messageThreadId;
+  }
+
   return {
     initData: b.initData,
+    originChatId,
+    originThreadId,
     type: b.type,
     device: b.device,
     browser,
@@ -108,7 +123,18 @@ export async function handleReportSubmit(
   const maxPhotos = Math.min(Number(env.MAX_PHOTOS ?? '3') || 3, 10);
   const photos = (body.photos ?? []).slice(0, maxPhotos);
 
-  const qaChatId = (await primaryQaChatIdAsync(env)) ?? auth.user.id;
+  const origin =
+    body.originChatId !== undefined
+      ? { chatId: body.originChatId, messageThreadId: body.originThreadId }
+      : undefined;
+  if (origin) {
+    await addExtraQaChatId(env, origin.chatId);
+    if (origin.messageThreadId) {
+      await setReportThreadId(env, origin.chatId, origin.messageThreadId);
+    }
+  }
+
+  const qaChatId = origin?.chatId ?? (await primaryQaChatIdAsync(env)) ?? auth.user.id;
   const device = body.device as DeviceKey;
   const browser = body.browser as BrowserKey | undefined;
 
@@ -149,17 +175,21 @@ export async function handleReportSubmit(
     }
   }
 
-  await announceNewCard(env, {
-    type: body.type,
-    device,
-    browser,
-    title: body.title,
-    cardName: card.name,
-    shortUrl: card.shortUrl,
-    reporterUsername: auth.user.username,
-    reporterId: auth.user.id,
-    reporterFirstName: auth.user.first_name,
-  });
+  await announceNewCard(
+    env,
+    {
+      type: body.type,
+      device,
+      browser,
+      title: body.title,
+      cardName: card.name,
+      shortUrl: card.shortUrl,
+      reporterUsername: auth.user.username,
+      reporterId: auth.user.id,
+      reporterFirstName: auth.user.first_name,
+    },
+    origin,
+  );
 
   try {
     const mention = formatReporterMention({

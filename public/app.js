@@ -35,16 +35,27 @@ const params = new URLSearchParams(location.search);
 applyPresetType(params.get('type'));
 
 const startParam = tg?.initDataUnsafe?.start_param ?? '';
-if (startParam && startParam !== 'product' && !startParam.startsWith('product_')) {
+/** @type {{ originChatId?: number; originThreadId?: number } | null} */
+let reportOrigin = null;
+const startOriginMatch = /^(\w+)_c(\d+)t(\d+)$/i.exec(startParam);
+if (startOriginMatch) {
+  applyPresetType(startOriginMatch[1]);
+  reportOrigin = {
+    originChatId: -Number(startOriginMatch[2]),
+    originThreadId: Number(startOriginMatch[3]),
+  };
+} else if (startParam && startParam !== 'product' && !startParam.startsWith('product_')) {
   applyPresetType(startParam);
 }
 
+function reportKindFromStartParam() {
+  if (startOriginMatch) return startOriginMatch[1].toLowerCase();
+  return startParam.toLowerCase();
+}
+
 function isProductMode() {
-  return (
-    params.get('mode') === 'product' ||
-    startParam === 'product' ||
-    startParam.startsWith('product_')
-  );
+  const kind = reportKindFromStartParam();
+  return params.get('mode') === 'product' || kind === 'product' || startParam.startsWith('product_');
 }
 
 const form = document.getElementById('form');
@@ -239,6 +250,7 @@ form.addEventListener('submit', async (e) => {
 
     const body = {
       initData: tg.initData,
+      ...(reportOrigin ?? {}),
       type: reportType,
       device,
       title: data.get('title'),
@@ -265,7 +277,12 @@ form.addEventListener('submit', async (e) => {
       tg.HapticFeedback.notificationOccurred('success');
     }
 
-    tg.showAlert('Saved to Trello INBOX. The QA channel has been notified.', () => tg.close());
+    tg.showAlert(
+      reportOrigin
+        ? 'Saved to Trello INBOX. Your Operations Hub topic has been notified.'
+        : 'Saved to Trello INBOX. The QA channel has been notified.',
+      () => tg.close(),
+    );
   } catch (err) {
     if (tg?.HapticFeedback?.notificationOccurred) {
       tg.HapticFeedback.notificationOccurred('error');

@@ -17,6 +17,10 @@ import { supersedePendingSplinterRun } from './poll-delivery';
 import { persistRunSession, startMasterSplinterRun } from './run';
 import { archiveAgent } from '../cursor-api';
 import { SplinterPresence } from './presence';
+import { wrapBuildRequirementsPrompt } from './build-prompt';
+import { triggerWorkerDeployFromTelegram } from './deploy-from-telegram';
+import { handleSplinterChannelSetup, parseChannelSetupAction } from './channel-setup';
+import { resolveOpsThread } from '../qa-threads';
 import {
   ensureRepoConfigured,
   handleMasterSplinterCancel,
@@ -26,6 +30,7 @@ import {
   handleMasterSplinterReset,
   handleMasterSplinterAllowQa,
   handleMasterSplinterStatus,
+  handleSetReportTopic,
 } from './subcommands';
 import { grantReportersFromList } from '../reporter-access';
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
@@ -54,6 +59,124 @@ function threadOpts(target: ReplyTarget) {
   return target.messageThreadId ? { messageThreadId: target.messageThreadId } : {};
 }
 
+async function resolveReplyTarget(
+  env: Env,
+  chatId: number,
+  messageThreadId?: number,
+): Promise<ReplyTarget> {
+  const resolved = await resolveOpsThread(env, chatId, messageThreadId);
+  return replyTarget(chatId, resolved);
+}
+
+/** `build …` / `req …` only; null if not a build command. Empty string = missing requirements. */
+function parseBuildRequirements(rest: string): string | null | undefined {
+  const normalized = rest.replace(/^build:\s*/i, 'build ');
+  if (normalized === 'build' || normalized === 'req') return '';
+  if (normalized.startsWith('build ')) return normalized.slice(6).trim();
+  if (normalized.startsWith('req ')) return normalized.slice(4).trim();
+  return null;
+}
+
+function buildCommandHelpText(): string {
+  return [
+    '<b>Build from Telegram</b>',
+    'Describe what you want after the command:',
+    `<code>${MASTER_SPLINTER_CMD} build Your requirements here</code>`,
+    `Short alias: <code>${MASTER_SPLINTER_CMD} req …</code>`,
+    '',
+    'Another repo (e.g. growth hub):',
+    `<code>${MASTER_SPLINTER_CMD} config repo https://github.com/Fyuturevizion/wlth-growth-hub</code>`,
+    '',
+    'After the agent pushes, deploy this Worker:',
+    `<code>${MASTER_SPLINTER_CMD} deploy</code> (or <code>ship</code>)`,
+  ].join('\n');
+}
+
+async function executeSplinterAgentRun(
+  env: Env,
+  target: ReplyTarget,
+  executionCtx: { waitUntil: (p: Promise<unknown>) => void },
+  input: {
+    userPrompt: string;
+    promptText: string;
+    forceNew: boolean;
+    runLabel: string;
+  },
+): Promise<void> {
+  const chatId = target.chatId;
+  const opts = threadOpts(target);
+
+  const config = await ensureRepoConfigured(env, chatId, target.messageThreadId);
+  if (!config) return;
+
+  await supersedePendingSplinterRun(env);
+
+  const priorSession = await loadAgentSession(env);
+
+  const presence = new SplinterPresence(env, chatId, target.messageThreadId);
+  await presence.start();
+
+  try {
+    if (input.forceNew && priorSession?.agentId) {
+      try {
+        await archiveAgent(env, priorSession.agentId);
+      } catch {
+        // ignore
+      }
+      await clearAgentSession(env);
+    }
+
+    const started = await startMasterSplinterRun(
+      env,
+      config,
+      input.promptText,
+      input.runLabel.slice(0, 80),
+      input.forceNew,
+    );
+    await persistRunSession(
+      env,
+      chatId,
+      started,
+      input.userPrompt,
+      priorSession?.promptCount,
+      target.messageThreadId,
+    );
+    await savePendingSplinterRun(env, {
+      agentId: started.agentId,
+      runId: started.runId,
+      chatId,
+      messageThreadId: target.messageThreadId,
+      createdAt: new Date().toISOString(),
+      presenceMessageId: presence.getMessageId(),
+      promptText: input.promptText,
+      runLabel: input.runLabel.slice(0, 80),
+    });
+    kickSplinterPollChain(env, executionCtx);
+    executionCtx.waitUntil(
+      streamPresenceWhileRunning(env, started.agentId, started.runId, presence, executionCtx),
+    );
+  } catch (error) {
+    await presence.finish();
+    const raw = error instanceof Error ? error.message : String(error);
+    const hint = raw.includes('Failed to verify existence of branch')
+      ? [
+          '',
+          '<b>Fix:</b> Cursor cannot read this repo yet.',
+          '1. Open cursor.com/dashboard → Integrations',
+          '2. Connect GitHub and allow access to the configured repo',
+          '3. Use an API key from that same Cursor account',
+          `4. Retry ${MASTER_SPLINTER_CMD}`,
+        ].join('\n')
+      : '';
+    await sendMessage(
+      env,
+      chatId,
+      `My student, I could not begin: ${escapeHtml(raw)}${hint}`,
+      { parseMode: 'HTML', ...opts },
+    );
+  }
+}
+
 async function runMasterSplinterPrompt(
   env: Env,
   target: ReplyTarget,
@@ -67,6 +190,23 @@ async function runMasterSplinterPrompt(
 
   if (rest === 'allow-qa' || rest === 'allow qa') {
     await handleMasterSplinterAllowQa(env, chatId, chatType ?? 'private', target.messageThreadId);
+    return;
+  }
+
+  if (rest === 'set-report-topic' || rest === 'set report topic') {
+    await handleSetReportTopic(env, chatId, chatType ?? 'private', target.messageThreadId);
+    return;
+  }
+
+  const channelAction = parseChannelSetupAction(rest);
+  if (channelAction) {
+    await handleSplinterChannelSetup(
+      env,
+      chatId,
+      chatType ?? 'private',
+      channelAction,
+      target.messageThreadId,
+    );
     return;
   }
 
@@ -92,6 +232,12 @@ async function runMasterSplinterPrompt(
       caption: 'Five minutes of jumping knees, as promised. The legs remember what the mind forgets.',
       messageThreadId: target.messageThreadId,
     });
+    return;
+  }
+
+  if (rest === 'deploy' || rest === 'ship') {
+    const result = await triggerWorkerDeployFromTelegram(env);
+    await sendMessage(env, chatId, result.message, { parseMode: 'HTML', ...opts });
     return;
   }
 
@@ -181,6 +327,24 @@ async function runMasterSplinterPrompt(
     return;
   }
 
+  const buildRequirements = parseBuildRequirements(rest);
+  if (buildRequirements !== null) {
+    if (!buildRequirements) {
+      await sendMessage(env, chatId, buildCommandHelpText(), { parseMode: 'HTML', ...opts });
+      return;
+    }
+    const config = await ensureRepoConfigured(env, chatId, target.messageThreadId);
+    if (!config) return;
+    const promptText = wrapBuildRequirementsPrompt(buildRequirements, config);
+    await executeSplinterAgentRun(env, target, executionCtx, {
+      userPrompt: buildRequirements,
+      promptText,
+      forceNew: true,
+      runLabel: `build: ${buildRequirements.slice(0, 60)}`,
+    });
+    return;
+  }
+
   const forceNew = rest.startsWith('new ');
   const userPrompt = forceNew ? rest.slice('new '.length).trim() : rest;
   if (!userPrompt) {
@@ -190,74 +354,15 @@ async function runMasterSplinterPrompt(
 
   const config = await ensureRepoConfigured(env, chatId, target.messageThreadId);
   if (!config) return;
-
-  await supersedePendingSplinterRun(env);
-
   const priorSession = await loadAgentSession(env);
-  const session = forceNew ? null : priorSession;
-  const promptText = buildPrompt(config, userPrompt, Boolean(session?.agentId));
+  const promptText = buildPrompt(config, userPrompt, Boolean(priorSession?.agentId) && !forceNew);
 
-  const presence = new SplinterPresence(env, chatId, target.messageThreadId);
-  await presence.start();
-
-  try {
-    if (forceNew && priorSession?.agentId) {
-      try {
-        await archiveAgent(env, priorSession.agentId);
-      } catch {
-        // ignore
-      }
-      await clearAgentSession(env);
-    }
-
-    const started = await startMasterSplinterRun(
-      env,
-      config,
-      promptText,
-      userPrompt.slice(0, 80),
-      forceNew,
-    );
-    await persistRunSession(
-      env,
-      chatId,
-      started,
-      userPrompt,
-      priorSession?.promptCount,
-    );
-    await savePendingSplinterRun(env, {
-      agentId: started.agentId,
-      runId: started.runId,
-      chatId,
-      messageThreadId: target.messageThreadId,
-      createdAt: new Date().toISOString(),
-      presenceMessageId: presence.getMessageId(),
-      promptText,
-      runLabel: userPrompt.slice(0, 80),
-    });
-    kickSplinterPollChain(env, executionCtx);
-    executionCtx.waitUntil(
-      streamPresenceWhileRunning(env, started.agentId, started.runId, presence, executionCtx),
-    );
-  } catch (error) {
-    await presence.finish();
-    const raw = error instanceof Error ? error.message : String(error);
-    const hint = raw.includes('Failed to verify existence of branch')
-      ? [
-          '',
-          '<b>Fix:</b> Cursor cannot read this repo yet.',
-          '1. Open cursor.com/dashboard → Integrations',
-          '2. Connect GitHub and allow <b>Fyuturevizion/TG-Trello-Agent</b>',
-          '3. Use an API key from that same Cursor account',
-          `4. Retry ${MASTER_SPLINTER_CMD}`,
-        ].join('\n')
-      : '';
-    await sendMessage(
-      env,
-      chatId,
-      `My student, I could not begin: ${escapeHtml(raw)}${hint}`,
-      { parseMode: 'HTML', ...opts },
-    );
-  }
+  await executeSplinterAgentRun(env, target, executionCtx, {
+    userPrompt,
+    promptText,
+    forceNew,
+    runLabel: userPrompt.slice(0, 80),
+  });
 }
 
 export async function handleMasterSplinterCommand(
@@ -299,9 +404,10 @@ export async function handleMasterSplinterCommand(
     return true;
   }
 
+  const target = await resolveReplyTarget(env, chatId, messageThreadId(message));
   await runMasterSplinterPrompt(
     env,
-    replyTarget(chatId, messageThreadId(message)),
+    target,
     rest,
     executionCtx,
     userId,
@@ -321,9 +427,14 @@ export async function handleAdminSplinterChat(
   if (!isAdminSplinterPing(message, env)) return false;
 
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));
+  const target = await resolveReplyTarget(
+    env,
+    message.chat.id,
+    messageThreadId(message),
+  );
   await runMasterSplinterPrompt(
     env,
-    replyTarget(message.chat.id, messageThreadId(message)),
+    target,
     rest,
     executionCtx,
     userId,

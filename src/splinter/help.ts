@@ -12,6 +12,8 @@ export function masterSplinterHelpText(): string {
     'While I work: typing and meditation quotes (no raw reasoning text).',
     `(Telegram menu: <code>${MASTER_SPLINTER_MENU_CMD}</code>, <code>${MASTER_SPLINTER_CMD}</code> also works in chat.)`,
     '/master-splinter &lt;message&gt;, speak to me',
+    '/master-splinter build &lt;requirements&gt;, implement via Cursor (alias: req)',
+    '/master-splinter deploy, ship Worker to production (alias: ship)',
     '/master-splinter link &lt;bc-id&gt;, attach an existing session',
     '/master-splinter status, last run',
     '/master-splinter cancel, cancel active run',
@@ -29,7 +31,8 @@ export function masterSplinterHelpText(): string {
     '/master-splinter new &lt;message&gt;, force a fresh agent session',
     '/master-splinter test, post sample card update to QA channel',
     '/master-splinter test-dm, send sample review DM to you',
-    '/master-splinter allow-qa, register this channel for triage updates',
+    '/master-splinter allow-qa, register this hub (run inside <b>Bugs + reporting</b>)',
+    '/master-splinter set-report-topic, route cards and Splinter replies to this topic',
     '/master-splinter add-reporter &lt;user_id&gt;, grant bug report access (comma-separated ok)',
   ].join('\n');
 }

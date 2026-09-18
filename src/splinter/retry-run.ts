@@ -60,6 +60,7 @@ export async function retryPendingWithFreshAgent(
     started,
     pending.runLabel ?? 'splinter-retry',
     undefined,
+    pending.messageThreadId,
   );
 
   await patchPendingSplinterRun(env, {

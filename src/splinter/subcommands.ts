@@ -19,6 +19,7 @@ import { MASTER_SPLINTER_CMD } from './command';
 import { escapeHtml, markdownToTelegramHtml } from '../telegram-format';
 import { postChannelTriggersToChat } from '../channel';
 import { addExtraQaChatId } from '../qa-chats';
+import { getReportThreadId, setReportThreadId, TELEGRAM_GENERAL_TOPIC_ID } from '../qa-threads';
 import { deleteMessage, sendMessage } from '../telegram';
 import type { Env } from '../types';
 
@@ -284,6 +285,55 @@ export async function handleMasterSplinterPurgeChannel(
   );
 }
 
+export async function handleSetReportTopic(
+  env: Env,
+  chatId: number,
+  chatType: string,
+  messageThreadId?: number,
+): Promise<void> {
+  const opts = threadOpts(messageThreadId);
+  const allowedTypes = new Set(['group', 'supergroup', 'channel']);
+  if (!allowedTypes.has(chatType)) {
+    await sendMessage(
+      env,
+      chatId,
+      'Run this inside your Operations Hub supergroup, in the <b>Bugs + reporting</b> topic.',
+      { parseMode: 'HTML', ...opts },
+    );
+    return;
+  }
+  if (!messageThreadId || messageThreadId === TELEGRAM_GENERAL_TOPIC_ID) {
+    await sendMessage(
+      env,
+      chatId,
+      [
+        'Open the <b>Bugs + reporting</b> topic first, then run:',
+        '<code>/master_splinter set-report-topic</code>',
+        '',
+        'I will post triage cards and Splinter replies there instead of General.',
+      ].join('\n'),
+      { parseMode: 'HTML', ...opts },
+    );
+    return;
+  }
+
+  await setReportThreadId(env, chatId, messageThreadId);
+  await postChannelTriggersToChat(env, chatId, messageThreadId);
+
+  await sendMessage(
+    env,
+    chatId,
+    [
+      'Report topic saved for this hub.',
+      `Chat ID: <code>${chatId}</code>`,
+      `Topic ID: <code>${messageThreadId}</code>`,
+      '',
+      'New bug cards, Trello updates, and Splinter ops will land in this topic.',
+    ].join('\n'),
+    { parseMode: 'HTML', ...opts },
+  );
+}
+
 export async function handleMasterSplinterAllowQa(
   env: Env,
   chatId: number,
@@ -303,7 +353,20 @@ export async function handleMasterSplinterAllowQa(
   }
 
   const ids = await addExtraQaChatId(env, chatId);
-  await postChannelTriggersToChat(env, chatId);
+  const reportThread =
+    messageThreadId && messageThreadId !== TELEGRAM_GENERAL_TOPIC_ID
+      ? messageThreadId
+      : await getReportThreadId(env, chatId);
+
+  if (messageThreadId && messageThreadId !== TELEGRAM_GENERAL_TOPIC_ID) {
+    await setReportThreadId(env, chatId, messageThreadId);
+  }
+
+  await postChannelTriggersToChat(env, chatId, reportThread);
+
+  const topicLine = reportThread
+    ? `Report topic: <code>${reportThread}</code>`
+    : 'Tip: run <code>/master_splinter set-report-topic</code> inside <b>Bugs + reporting</b> so cards do not land in General.';
 
   await sendMessage(
     env,
@@ -312,6 +375,7 @@ export async function handleMasterSplinterAllowQa(
       'This chat is now on the QA allowlist.',
       `Chat ID: <code>${chatId}</code>`,
       `Registered channels: ${ids.length}`,
+      topicLine,
       '',
       'Pinned triage buttons are refreshed. Reporters can use /report here again.',
     ].join('\n'),

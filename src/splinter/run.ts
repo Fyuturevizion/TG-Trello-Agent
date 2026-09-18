@@ -144,6 +144,7 @@ export async function persistRunSession(
   started: StartedCloudRun,
   lastPrompt: string,
   priorPromptCount?: number,
+  notifyMessageThreadId?: number,
 ): Promise<void> {
   const promptCount = started.freshSession
     ? 1
@@ -154,6 +155,7 @@ export async function persistRunSession(
     latestRunId: started.runId,
     agentUrl: started.agentUrl,
     notifyChatId: chatId,
+    notifyMessageThreadId,
     lastPrompt: lastPrompt.slice(0, 500),
     promptCount,
     updatedAt: new Date().toISOString(),

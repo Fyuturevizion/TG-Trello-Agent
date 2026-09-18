@@ -10,6 +10,11 @@ export interface Env {
   TELEGRAM_WEBHOOK_SECRET: string;
   /** One or more QA supergroup IDs, comma-separated (e.g. -100111,-100222). */
   TELEGRAM_QA_CHAT_ID: string;
+  /**
+   * Forum topic for triage in each hub: chatId:message_thread_id pairs, comma-separated.
+   * Example: -1004465145918:42
+   */
+  TELEGRAM_QA_REPORT_THREADS?: string;
   /** Growth Hub Dojo supergroup (forum) — always treated as an allowed chat. */
   TELEGRAM_DOJO_CHAT_ID?: string;
   /** Dojo keeper — only this user may run /dojo_grant with the secret word. */
@@ -66,6 +71,12 @@ export interface Env {
   CURSOR_AGENT_FAST?: string;
   /** Prompts before rotating to a fresh agent session (default 8). */
   CURSOR_AGENT_MAX_SESSION_PROMPTS?: string;
+  /** PAT to POST workflow_dispatch for Deploy Worker (Actions: read and write). */
+  GITHUB_DEPLOY_TOKEN?: string;
+  /** Repo for deploy dispatch (default Fyuturevizion/TG-Trello-Agent). */
+  GITHUB_DEPLOY_REPO?: string;
+  /** Git ref for deploy workflow (default main). */
+  GITHUB_DEPLOY_REF?: string;
 
   /** Slack Sensei — separate from TG Splinter; see src/slack-sensei/ */
   SLACK_BOT_TOKEN?: string;
