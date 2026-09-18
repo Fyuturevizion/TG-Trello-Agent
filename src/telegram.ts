@@ -1,4 +1,5 @@
 import { parseAllowedChatIdsAsync } from './qa-chats';
+import { recordBotMessageId } from './bot-message-log';
 import { isReporterAllowed } from './reporter-access';
 import type { Env } from './types';
 
@@ -24,6 +25,19 @@ type InlineKeyboard = {
 };
 
 export type ReplyMarkup = InlineKeyboard | { remove_keyboard: true };
+
+let cachedBotUserId: number | null = null;
+
+export async function getBotUserId(env: Env): Promise<number> {
+  if (env.TELEGRAM_BOT_ID) {
+    const parsed = Number(env.TELEGRAM_BOT_ID);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  if (cachedBotUserId) return cachedBotUserId;
+  const me = await telegramRequest<{ id: number }>(env, 'getMe');
+  cachedBotUserId = me.id;
+  return me.id;
+}
 
 async function telegramRequest<T>(
   env: Env,
@@ -54,13 +68,15 @@ export async function sendMessage(
     messageThreadId?: number;
   },
 ): Promise<{ message_id: number }> {
-  return telegramRequest(env, 'sendMessage', {
+  const result = await telegramRequest<{ message_id: number }>(env, 'sendMessage', {
     chat_id: chatId,
     text,
     parse_mode: options?.parseMode,
     reply_markup: options?.replyMarkup,
     message_thread_id: options?.messageThreadId,
   });
+  void recordBotMessageId(env, chatId, result.message_id, options?.messageThreadId);
+  return result;
 }
 
 export async function editMessageText(
@@ -77,6 +93,21 @@ export async function editMessageText(
     message_id: messageId,
     text,
     parse_mode: parseMode,
+    reply_markup: replyMarkup,
+    message_thread_id: messageThreadId,
+  });
+}
+
+export async function editMessageReplyMarkup(
+  env: Env,
+  chatId: number,
+  messageId: number,
+  replyMarkup: ReplyMarkup,
+  messageThreadId?: number,
+): Promise<void> {
+  await telegramRequest(env, 'editMessageReplyMarkup', {
+    chat_id: chatId,
+    message_id: messageId,
     reply_markup: replyMarkup,
     message_thread_id: messageThreadId,
   });
@@ -135,13 +166,15 @@ export async function sendPhoto(
   photoUrl: string,
   options?: { caption?: string; parseMode?: 'HTML'; messageThreadId?: number },
 ): Promise<{ message_id: number }> {
-  return telegramRequest(env, 'sendPhoto', {
+  const result = await telegramRequest<{ message_id: number }>(env, 'sendPhoto', {
     chat_id: chatId,
     photo: photoUrl,
     caption: options?.caption,
     parse_mode: options?.parseMode,
     message_thread_id: options?.messageThreadId,
   });
+  void recordBotMessageId(env, chatId, result.message_id, options?.messageThreadId);
+  return result;
 }
 
 export function inlineKeyboard(rows: Array<Array<InlineButton>>): InlineKeyboard {
