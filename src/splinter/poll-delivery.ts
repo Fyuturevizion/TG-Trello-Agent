@@ -8,6 +8,11 @@ import {
 } from './pending-run';
 import { deliverRunReply } from './relay';
 import { isFastEmptyCursorError, retryPendingWithFreshAgent } from './retry-run';
+import {
+  extractUserPromptFromWrapped,
+  isPurgeBotMessagesRequest,
+} from './purge-intent';
+import { purgeBotMessagesInChat } from './purge-bot-messages';
 import { cancelRun, getRun, isTerminalRunStatus } from '../cursor-api';
 import { sendMessage } from '../telegram';
 import type { Env } from '../types';
@@ -82,6 +87,23 @@ export async function deliverPendingIfReady(
           firePollRequest(env);
         }
         return false;
+      }
+    }
+
+    const purgeSource =
+      pending.runLabel ??
+      (pending.promptText ? extractUserPromptFromWrapped(pending.promptText) : '');
+    if (isPurgeBotMessagesRequest(purgeSource)) {
+      try {
+        await purgeBotMessagesInChat(env, pending.chatId, undefined, pending.messageThreadId);
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            event: 'splinter_purge_bot_messages_error',
+            chatId: pending.chatId,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
       }
     }
 

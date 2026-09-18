@@ -15,6 +15,8 @@ import { extractAdminSplinterPrompt, isAdminSplinterPing } from './admin-chat';
 import { savePendingSplinterRun } from './pending-run';
 import { supersedePendingSplinterRun } from './poll-delivery';
 import { persistRunSession, startMasterSplinterRun } from './run';
+import { isPurgeBotMessagesRequest } from './purge-intent';
+import { handleMasterSplinterPurgeBotMessages } from './purge-bot-messages';
 import { archiveAgent } from '../cursor-api';
 import { SplinterPresence } from './presence';
 import {
@@ -185,6 +187,17 @@ async function runMasterSplinterPrompt(
   const userPrompt = forceNew ? rest.slice('new '.length).trim() : rest;
   if (!userPrompt) {
     await sendMessage(env, chatId, masterSplinterHelpText(), { parseMode: 'HTML', ...opts });
+    return;
+  }
+
+  if (isPurgeBotMessagesRequest(userPrompt)) {
+    const countMatch = userPrompt.match(/\b(\d{3,4})\b/);
+    await handleMasterSplinterPurgeBotMessages(
+      env,
+      chatId,
+      countMatch?.[1],
+      target.messageThreadId,
+    );
     return;
   }
 

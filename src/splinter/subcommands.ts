@@ -19,8 +19,9 @@ import { MASTER_SPLINTER_CMD } from './command';
 import { escapeHtml, markdownToTelegramHtml } from '../telegram-format';
 import { postChannelTriggersToChat } from '../channel';
 import { addExtraQaChatId } from '../qa-chats';
-import { deleteMessage, sendMessage } from '../telegram';
+import { sendMessage } from '../telegram';
 import type { Env } from '../types';
+import { handleMasterSplinterPurgeBotMessages } from './purge-bot-messages';
 
 function threadOpts(messageThreadId?: number) {
   return messageThreadId ? { messageThreadId } : {};
@@ -255,34 +256,17 @@ export async function handleMasterSplinterConfig(
   });
 }
 
-/** Best-effort delete of recent messages in this chat (bot needs delete permission). */
+/** Best-effort delete of this bot's messages in this chat (never other members' lines). */
 export async function handleMasterSplinterPurgeChannel(
   env: Env,
   chatId: number,
   scanCountRaw: string | undefined,
   messageThreadId?: number,
 ): Promise<void> {
-  const opts = threadOpts(messageThreadId);
-  const scanCount = Math.min(Math.max(Number(scanCountRaw ?? '600') || 600, 50), 3000);
-
-  const anchor = await sendMessage(env, chatId, '…', opts);
-  let deleted = 0;
-  for (let id = anchor.message_id; id > anchor.message_id - scanCount; id--) {
-    try {
-      await deleteMessage(env, chatId, id, messageThreadId);
-      deleted++;
-    } catch {
-      // message missing or too old
-    }
-  }
-
-  await sendMessage(
-    env,
-    chatId,
-    `Cleared ${deleted} recent messages in this thread, my student. The dojo breathes again.`,
-    opts,
-  );
+  await handleMasterSplinterPurgeBotMessages(env, chatId, scanCountRaw, messageThreadId);
 }
+
+export { handleMasterSplinterPurgeBotMessages } from './purge-bot-messages';
 
 export async function handleMasterSplinterAllowQa(
   env: Env,
