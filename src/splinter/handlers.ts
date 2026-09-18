@@ -17,6 +17,8 @@ import { supersedePendingSplinterRun } from './poll-delivery';
 import { persistRunSession, startMasterSplinterRun } from './run';
 import { archiveAgent } from '../cursor-api';
 import { SplinterPresence } from './presence';
+import { handleSplinterChannelSetup, parseChannelSetupAction } from './channel-setup';
+import { resolveOpsThread } from '../qa-threads';
 import {
   ensureRepoConfigured,
   handleMasterSplinterCancel,
@@ -26,6 +28,7 @@ import {
   handleMasterSplinterReset,
   handleMasterSplinterAllowQa,
   handleMasterSplinterStatus,
+  handleSetReportTopic,
 } from './subcommands';
 import { grantReportersFromList } from '../reporter-access';
 import { sendTestCardUpdate, sendTestReviewDm } from '../channel';
@@ -54,6 +57,15 @@ function threadOpts(target: ReplyTarget) {
   return target.messageThreadId ? { messageThreadId: target.messageThreadId } : {};
 }
 
+async function resolveReplyTarget(
+  env: Env,
+  chatId: number,
+  messageThreadId?: number,
+): Promise<ReplyTarget> {
+  const resolved = await resolveOpsThread(env, chatId, messageThreadId);
+  return replyTarget(chatId, resolved);
+}
+
 async function runMasterSplinterPrompt(
   env: Env,
   target: ReplyTarget,
@@ -67,6 +79,23 @@ async function runMasterSplinterPrompt(
 
   if (rest === 'allow-qa' || rest === 'allow qa') {
     await handleMasterSplinterAllowQa(env, chatId, chatType ?? 'private', target.messageThreadId);
+    return;
+  }
+
+  if (rest === 'set-report-topic' || rest === 'set report topic') {
+    await handleSetReportTopic(env, chatId, chatType ?? 'private', target.messageThreadId);
+    return;
+  }
+
+  const channelAction = parseChannelSetupAction(rest);
+  if (channelAction) {
+    await handleSplinterChannelSetup(
+      env,
+      chatId,
+      chatType ?? 'private',
+      channelAction,
+      target.messageThreadId,
+    );
     return;
   }
 
@@ -223,6 +252,7 @@ async function runMasterSplinterPrompt(
       started,
       userPrompt,
       priorSession?.promptCount,
+      target.messageThreadId,
     );
     await savePendingSplinterRun(env, {
       agentId: started.agentId,
@@ -299,9 +329,10 @@ export async function handleMasterSplinterCommand(
     return true;
   }
 
+  const target = await resolveReplyTarget(env, chatId, messageThreadId(message));
   await runMasterSplinterPrompt(
     env,
-    replyTarget(chatId, messageThreadId(message)),
+    target,
     rest,
     executionCtx,
     userId,
@@ -321,9 +352,14 @@ export async function handleAdminSplinterChat(
   if (!isAdminSplinterPing(message, env)) return false;
 
   const rest = extractAdminSplinterPrompt(messageText(message), resolveBotUsername(env));
+  const target = await resolveReplyTarget(
+    env,
+    message.chat.id,
+    messageThreadId(message),
+  );
   await runMasterSplinterPrompt(
     env,
-    replyTarget(message.chat.id, messageThreadId(message)),
+    target,
     rest,
     executionCtx,
     userId,

@@ -9,6 +9,7 @@ import { REPORT_TYPE_LABELS } from './types';
 import { resolveBotUsername } from './bot-identity';
 import { loadActiveProduct } from './product/session';
 import { getAllQaChatIds, primaryQaChatIdAsync } from './qa-chats';
+import { qaDeliveryThreadId } from './qa-threads';
 
 export async function announceNewCard(
   env: Env,
@@ -44,7 +45,11 @@ export async function announceNewCard(
   }).join('\n');
 
   for (const chatId of chatIds) {
-    await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+    const messageThreadId = await qaDeliveryThreadId(env, chatId);
+    await sendMessage(env, chatId, text, {
+      parseMode: 'HTML',
+      ...(messageThreadId ? { messageThreadId } : {}),
+    });
   }
 }
 
@@ -65,7 +70,11 @@ export async function sendTestCardUpdate(env: Env): Promise<boolean> {
     createdBy: '@Connor13all',
   }).join('\n');
 
-  await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+  const messageThreadId = await qaDeliveryThreadId(env, chatId);
+  await sendMessage(env, chatId, text, {
+    parseMode: 'HTML',
+    ...(messageThreadId ? { messageThreadId } : {}),
+  });
   return true;
 }
 
@@ -95,12 +104,21 @@ export async function announceTrelloEvent(
 
   const text = lines.join('\n');
   for (const chatId of chatIds) {
-    await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+    const messageThreadId = await qaDeliveryThreadId(env, chatId);
+    await sendMessage(env, chatId, text, {
+      parseMode: 'HTML',
+      ...(messageThreadId ? { messageThreadId } : {}),
+    });
   }
 }
 
-/** Post pinned triage buttons in one QA chat. */
-export async function postChannelTriggersToChat(env: Env, chatId: number): Promise<void> {
+/** Post pinned triage buttons in one QA chat (optional forum topic). */
+export async function postChannelTriggersToChat(
+  env: Env,
+  chatId: number,
+  messageThreadId?: number,
+): Promise<void> {
+  const thread = messageThreadId ?? (await qaDeliveryThreadId(env, chatId));
   const sent = await sendMessage(
     env,
     chatId,
@@ -109,7 +127,10 @@ export async function postChannelTriggersToChat(env: Env, chatId: number): Promi
       '',
       'Tap a button to open the report form. One message is posted here when a card is submitted.',
     ].join('\n'),
-    { replyMarkup: await channelTriggerKeyboard(env) },
+    {
+      replyMarkup: await channelTriggerKeyboard(env),
+      ...(thread ? { messageThreadId: thread } : {}),
+    },
   );
 
   try {

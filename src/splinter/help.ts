@@ -29,7 +29,8 @@ export function masterSplinterHelpText(): string {
     '/master-splinter new &lt;message&gt;, force a fresh agent session',
     '/master-splinter test, post sample card update to QA channel',
     '/master-splinter test-dm, send sample review DM to you',
-    '/master-splinter allow-qa, register this channel for triage updates',
+    '/master-splinter allow-qa, register this hub (run inside <b>Bugs + reporting</b>)',
+    '/master-splinter set-report-topic, route cards and Splinter replies to this topic',
     '/master-splinter add-reporter &lt;user_id&gt;, grant bug report access (comma-separated ok)',
   ].join('\n');
 }

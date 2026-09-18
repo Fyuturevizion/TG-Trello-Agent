@@ -1,6 +1,7 @@
 import { escapeHtml, formatBoardLine, formatTrelloUrlLink } from '../telegram-format';
 import { sendMessage } from '../telegram';
 import { getAllQaChatIds } from '../qa-chats';
+import { qaDeliveryThreadId } from '../qa-threads';
 import type { Env } from '../types';
 
 export async function announceProductOpened(
@@ -21,7 +22,11 @@ export async function announceProductOpened(
   ].join('\n');
 
   for (const chatId of chatIds) {
-    await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+    const messageThreadId = await qaDeliveryThreadId(env, chatId);
+    await sendMessage(env, chatId, text, {
+      parseMode: 'HTML',
+      ...(messageThreadId ? { messageThreadId } : {}),
+    });
   }
 }
 
@@ -36,7 +41,11 @@ export async function announceProductClosed(env: Env, displayName: string): Prom
   ].join('\n');
 
   for (const chatId of chatIds) {
-    await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+    const messageThreadId = await qaDeliveryThreadId(env, chatId);
+    await sendMessage(env, chatId, text, {
+      parseMode: 'HTML',
+      ...(messageThreadId ? { messageThreadId } : {}),
+    });
   }
 }
 
@@ -72,6 +81,10 @@ export async function announceProductFeedback(
   ].join('\n');
 
   for (const chatId of chatIds) {
-    await sendMessage(env, chatId, text, { parseMode: 'HTML' });
+    const messageThreadId = await qaDeliveryThreadId(env, chatId);
+    await sendMessage(env, chatId, text, {
+      parseMode: 'HTML',
+      ...(messageThreadId ? { messageThreadId } : {}),
+    });
   }
 }

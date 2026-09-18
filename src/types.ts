@@ -10,6 +10,11 @@ export interface Env {
   TELEGRAM_WEBHOOK_SECRET: string;
   /** One or more QA supergroup IDs, comma-separated (e.g. -100111,-100222). */
   TELEGRAM_QA_CHAT_ID: string;
+  /**
+   * Forum topic for triage in each hub: chatId:message_thread_id pairs, comma-separated.
+   * Example: -1004465145918:42
+   */
+  TELEGRAM_QA_REPORT_THREADS?: string;
   /** Growth Hub Dojo supergroup (forum) — always treated as an allowed chat. */
   TELEGRAM_DOJO_CHAT_ID?: string;
   /** Dojo keeper — only this user may run /dojo_grant with the secret word. */

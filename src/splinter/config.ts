@@ -30,6 +30,8 @@ export interface AgentSession {
   lastDeliveredRunId?: string;
   agentUrl?: string;
   notifyChatId: number;
+  /** Forum topic for Splinter replies in supergroups with topics. */
+  notifyMessageThreadId?: number;
   lastPrompt?: string;
   promptCount: number;
   updatedAt: string;

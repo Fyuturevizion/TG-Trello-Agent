@@ -113,10 +113,12 @@ export async function deliverLatestSessionRun(
   if (!session?.latestRunId || session.notifyChatId !== chatId) return false;
   if (session.lastDeliveredRunId === session.latestRunId) return false;
 
+  const thread = messageThreadId ?? session.notifyMessageThreadId;
+
   try {
     const run = await getRun(env, session.agentId, session.latestRunId);
     if (!isTerminalRunStatus(run.status)) return false;
-    await deliverRunReply(env, chatId, run, messageThreadId);
+    await deliverRunReply(env, chatId, run, thread);
     await saveAgentSession(env, { ...session, lastDeliveredRunId: session.latestRunId });
     return true;
   } catch (error) {
