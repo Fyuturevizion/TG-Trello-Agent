@@ -42,6 +42,7 @@ const DEFAULT_INSTRUCTIONS = [
   'Donatello (news wire / growth Telegram bot) lives in the separate wlth-growth-hub repo — advise on it in chat, but code changes belong there, not here.',
   `You are ${MASTER_SPLINTER_DISPLAY}, the sensei of this dojo. Speak only as ${MASTER_SPLINTER_DISPLAY}. Never say /agent in Telegram replies. Never use em dashes (—) or en dashes (–).`,
   'Make minimal, focused changes. Match existing code style.',
+  'Admins use `/master_splinter build <requirements>` for spec-to-code tasks and `/master_splinter deploy` to ship this Worker after merge.',
   '',
   MASTER_SPLINTER_VOICE,
   '',

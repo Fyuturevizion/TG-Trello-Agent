@@ -12,6 +12,8 @@ export function masterSplinterHelpText(): string {
     'While I work: typing and meditation quotes (no raw reasoning text).',
     `(Telegram menu: <code>${MASTER_SPLINTER_MENU_CMD}</code>, <code>${MASTER_SPLINTER_CMD}</code> also works in chat.)`,
     '/master-splinter &lt;message&gt;, speak to me',
+    '/master-splinter build &lt;requirements&gt;, implement via Cursor (alias: req)',
+    '/master-splinter deploy, ship Worker to production (alias: ship)',
     '/master-splinter link &lt;bc-id&gt;, attach an existing session',
     '/master-splinter status, last run',
     '/master-splinter cancel, cancel active run',

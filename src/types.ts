@@ -71,6 +71,12 @@ export interface Env {
   CURSOR_AGENT_FAST?: string;
   /** Prompts before rotating to a fresh agent session (default 8). */
   CURSOR_AGENT_MAX_SESSION_PROMPTS?: string;
+  /** PAT to POST workflow_dispatch for Deploy Worker (Actions: read and write). */
+  GITHUB_DEPLOY_TOKEN?: string;
+  /** Repo for deploy dispatch (default Fyuturevizion/TG-Trello-Agent). */
+  GITHUB_DEPLOY_REPO?: string;
+  /** Git ref for deploy workflow (default main). */
+  GITHUB_DEPLOY_REF?: string;
 
   /** Slack Sensei — separate from TG Splinter; see src/slack-sensei/ */
   SLACK_BOT_TOKEN?: string;
