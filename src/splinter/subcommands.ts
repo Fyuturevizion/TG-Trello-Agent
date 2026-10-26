@@ -215,7 +215,7 @@ export async function handleMasterSplinterConfig(
         `Fast mode: ${config.fastMode ? 'on' : 'off'}`,
         `Session limit: ${config.maxSessionPrompts} prompts`,
         '',
-        escapeHtml(config.systemInstructions.slice(0, 500)),
+        `System instructions: ${config.systemInstructions.length} chars (use <code>config instructions …</code> to change, not shown here).`,
       ].join('\n'),
       { parseMode: 'HTML', ...opts },
     );
